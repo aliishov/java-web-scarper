@@ -67,7 +67,7 @@ public class ScrapeJob extends BaseEntity {
 	LocalDate dateTo;
 
 	@Enumerated(EnumType.STRING)
-	@Column(name = "status", nullable = false)
+	@Column(name = "status", nullable = false, length = 32)
 	@Builder.Default
 	ScrapeJobStatus status = ScrapeJobStatus.PENDING;
 
