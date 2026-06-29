@@ -60,7 +60,7 @@ public class Source extends BaseEntity {
 	String name;
 
 	@Enumerated(EnumType.STRING)
-	@Column(name = "type", nullable = false)
+	@Column(name = "type", nullable = false, length = 32)
 	SourceType type;
 
 	@Column(name = "base_url", nullable = false, columnDefinition = "TEXT")
