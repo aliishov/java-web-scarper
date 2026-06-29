@@ -2,14 +2,15 @@ package org.raul.javawebscarper.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -23,10 +24,20 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
 import org.raul.javawebscarper.model.enumerated.SourceType;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
-@Table(name = "sources", schema = "core")
+@Table(
+		name = "sources",
+		schema = "core",
+		uniqueConstraints = {
+				@UniqueConstraint(name = "uq_sources_code", columnNames = "code"),
+				@UniqueConstraint(name = "uq_sources_name", columnNames = "name"),
+				@UniqueConstraint(name = "uq_sources_base_url", columnNames = "base_url")
+		},
+		indexes = {
+				@Index(name = "idx_sources_type_enabled", columnList = "type,is_enabled")
+		}
+)
 @Getter
 @Setter
 @Builder
@@ -35,27 +46,27 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @AllArgsConstructor
 @DynamicInsert
 @DynamicUpdate
-@EntityListeners(AuditingEntityListener.class)
-@SequenceGenerator(name = "sr_seq", sequenceName = "core.sources_seq", allocationSize = 50)
-public class Source {
+@SequenceGenerator(name = "source_seq", sequenceName = "core.sources_seq", allocationSize = 50)
+public class Source extends BaseEntity {
 
 	@Id
-	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sr_seq")
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "source_seq")
 	Integer id;
 
-	@Column(name = "code", nullable = false, unique = true)
-	Integer code;
+	@Column(name = "code", nullable = false, length = 100)
+	String code;
 
-	@Column(name = "name", nullable = false, unique = true)
+	@Column(name = "name", nullable = false)
 	String name;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "type", nullable = false)
 	SourceType type;
 
-	@Column(name = "base_url", nullable = false, unique = true)
+	@Column(name = "base_url", nullable = false, columnDefinition = "TEXT")
 	String baseUrl;
 
 	@Column(name = "is_enabled", nullable = false)
+	@Builder.Default
 	boolean enabled = true;
 }
