@@ -85,7 +85,7 @@ public class Post extends BaseEntity {
 	@Column(name = "text", nullable = false, updatable = false, columnDefinition = "TEXT")
 	String text;
 
-	@Column(name = "text_hash", nullable = false, updatable = false)
+	@Column(name = "text_hash", nullable = false, updatable = false, length = 128)
 	String textHash;
 
 	@Column(name = "language", length = 16)
