@@ -60,7 +60,7 @@ public class PostMedia extends BaseEntity {
 	Post post;
 
 	@Enumerated(EnumType.STRING)
-	@Column(name = "media_type", nullable = false, updatable = false)
+	@Column(name = "media_type", nullable = false, updatable = false, length = 32)
 	MediaType mediaType;
 
 	@Column(name = "media_url", nullable = false, updatable = false, columnDefinition = "TEXT")
