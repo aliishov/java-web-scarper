@@ -2,12 +2,16 @@ package org.raul.javawebscarper.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -20,12 +24,18 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.util.UUID;
-
 @Entity
-@Table(name = "post_keywords", schema = "core")
+@Table(
+		name = "post_keywords",
+		schema = "core",
+		uniqueConstraints = {
+				@UniqueConstraint(name = "uq_post_keywords_post_keyword", columnNames = {"post_id", "keyword_id"})
+		},
+		indexes = {
+				@Index(name = "idx_post_keywords_post_id", columnList = "post_id"),
+				@Index(name = "idx_post_keywords_keyword_id", columnList = "keyword_id")
+		}
+)
 @Getter
 @Setter
 @Builder
@@ -34,20 +44,21 @@ import java.util.UUID;
 @AllArgsConstructor
 @DynamicInsert
 @DynamicUpdate
-@EntityListeners(AuditingEntityListener.class)
 @SequenceGenerator(name = "pkw_seq", sequenceName = "core.post_keywords_seq", allocationSize = 50)
-public class PostKeyword {
+public class PostKeyword extends BaseEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "pkw_seq")
 	Integer id;
 
-	@Column(name = "post_id", nullable = false, updatable = false)
-	UUID postId;
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "post_id", nullable = false, updatable = false)
+	Post post;
 
-	@Column(name = "keyword_id", nullable = false, updatable = false)
-	Integer keywordId;
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "keyword_id", nullable = false, updatable = false)
+	Keyword keyword;
 
-	@Column(name = "matched_text", nullable = false, updatable = false)
+	@Column(name = "matched_text", updatable = false, columnDefinition = "TEXT")
 	String matchedText;
 }
