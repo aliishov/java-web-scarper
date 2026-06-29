@@ -31,6 +31,7 @@ import java.util.UUID;
 		schema = "core",
 		uniqueConstraints = {
 				@UniqueConstraint(name = "uq_authors_source_external_id", columnNames = {"source_id", "external_id"}),
+				@UniqueConstraint(name = "uq_authors_source_username", columnNames = {"source_id", "username"}),
 				@UniqueConstraint(name = "uq_authors_profile_url", columnNames = "profile_url")
 		},
 		indexes = {
