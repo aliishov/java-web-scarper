@@ -2,11 +2,15 @@ package org.raul.javawebscarper.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -19,15 +23,22 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "authors", schema = "core")
+@Table(
+		name = "authors",
+		schema = "core",
+		uniqueConstraints = {
+				@UniqueConstraint(name = "uq_authors_source_external_id", columnNames = {"source_id", "external_id"}),
+				@UniqueConstraint(name = "uq_authors_source_username", columnNames = {"source_id", "username"}),
+				@UniqueConstraint(name = "uq_authors_profile_url", columnNames = "profile_url")
+		},
+		indexes = {
+				@Index(name = "idx_authors_source_id", columnList = "source_id"),
+				@Index(name = "idx_authors_source_username", columnList = "source_id,username")
+		}
+)
 @Getter
 @Setter
 @Builder
@@ -36,30 +47,22 @@ import java.util.UUID;
 @AllArgsConstructor
 @DynamicInsert
 @DynamicUpdate
-@EntityListeners(AuditingEntityListener.class)
-public class Author {
+public class Author extends BaseEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	UUID id;
 
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "source_id", nullable = false)
+	Source source;
+
 	@Column(name = "username", nullable = false)
 	String username;
 
-	@Column(name = "source_id", nullable = false)
-	Integer sourceId;
-
 	@Column(name = "external_id")
-	Integer externalId;
+	String externalId;
 
-	@Column(name = "profile_url", nullable = false, unique = true, columnDefinition = "TEXT")
+	@Column(name = "profile_url", columnDefinition = "TEXT")
 	String profileUrl;
-
-	@CreatedDate
-	@Column(name = "created_at", nullable = false, updatable = false)
-	OffsetDateTime createdAt;
-
-	@LastModifiedDate
-	@Column(name = "updatedAt")
-	OffsetDateTime updatedAt;
 }
