@@ -45,6 +45,18 @@ management:
 server:
   port: ${SERVER_PORT:8080}
 
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+    path: /swagger-ui.html
+  packages-to-scan:
+    - org.raul.javawebscarper.controller
+  paths-to-match:
+    - /api/**
+
 logging:
   level:
     org.raul.javawebscarper: ${APP_LOG_LEVEL:INFO}
