@@ -1,17 +1,18 @@
 package org.raul.javawebscarper.mapper;
 
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobRequest;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobResponse;
+import org.raul.javawebscarper.dto.request.scrapejob.CreateScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
-import org.springframework.stereotype.Component;
 
-@Component
-public class ScrapeJobMapper {
+public final class ScrapeJobMapper {
 
-	public ScrapeJob toEntity(ScrapeJobRequest request, Source source, Keyword keyword) {
+	private ScrapeJobMapper() {
+	}
+
+	public static ScrapeJob toEntity(CreateScrapeJobRequestDTO request, Source source, Keyword keyword) {
 		return ScrapeJob.builder()
 				.source(source)
 				.keyword(keyword)
@@ -23,8 +24,8 @@ public class ScrapeJobMapper {
 				.build();
 	}
 
-	public ScrapeJobResponse toResponse(ScrapeJob scrapeJob) {
-		return new ScrapeJobResponse(
+	public static ScrapeJobResponseDTO toResponse(ScrapeJob scrapeJob) {
+		return new ScrapeJobResponseDTO(
 				scrapeJob.getId(),
 				scrapeJob.getSource().getId(),
 				scrapeJob.getSource().getCode(),

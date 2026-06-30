@@ -1,11 +1,11 @@
 package org.raul.javawebscarper.service;
 
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.common.PageResponse;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobCompleteRequest;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobFailRequest;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobRequest;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobResponse;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
+import org.raul.javawebscarper.dto.request.scrapejob.CompleteScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.request.scrapejob.FailScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.request.scrapejob.CreateScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
 import org.raul.javawebscarper.exception.BadRequestException;
 import org.raul.javawebscarper.exception.ResourceNotFoundException;
 import org.raul.javawebscarper.mapper.ScrapeJobMapper;
@@ -30,19 +30,18 @@ public class ScrapeJobService {
 	private final ScrapeJobRepository scrapeJobRepository;
 	private final SourceService sourceService;
 	private final KeywordService keywordService;
-	private final ScrapeJobMapper scrapeJobMapper;
 
 	@Transactional
-	public ScrapeJobResponse create(ScrapeJobRequest request) {
+	public ScrapeJobResponseDTO create(CreateScrapeJobRequestDTO request) {
 		validateDateRange(request.dateFrom(), request.dateTo());
 		Source source = sourceService.getEntity(request.sourceId());
 		Keyword keyword = keywordService.getEntity(request.keywordId());
-		ScrapeJob scrapeJob = scrapeJobMapper.toEntity(request, source, keyword);
-		return scrapeJobMapper.toResponse(scrapeJobRepository.save(scrapeJob));
+		ScrapeJob scrapeJob = ScrapeJobMapper.toEntity(request, source, keyword);
+		return ScrapeJobMapper.toResponse(scrapeJobRepository.save(scrapeJob));
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<ScrapeJobResponse> findAll(
+	public PageResponseDTO<ScrapeJobResponseDTO> findAll(
 			Integer sourceId,
 			Integer keywordId,
 			ScrapeJobStatus status,
@@ -52,27 +51,27 @@ public class ScrapeJobService {
 	) {
 		validateDateRange(dateFrom, dateTo);
 		Specification<ScrapeJob> specification = buildSpecification(sourceId, keywordId, status, dateFrom, dateTo);
-		return PageResponse.from(scrapeJobRepository.findAll(specification, pageable), scrapeJobMapper::toResponse);
+		return PageResponseDTO.from(scrapeJobRepository.findAll(specification, pageable), ScrapeJobMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public ScrapeJobResponse findById(UUID id) {
-		return scrapeJobMapper.toResponse(getEntity(id));
+	public ScrapeJobResponseDTO findById(UUID id) {
+		return ScrapeJobMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<ScrapeJobResponse> findBySource(Integer sourceId, Pageable pageable) {
+	public PageResponseDTO<ScrapeJobResponseDTO> findBySource(Integer sourceId, Pageable pageable) {
 		Source source = sourceService.getEntity(sourceId);
-		return PageResponse.from(scrapeJobRepository.findBySource(source, pageable), scrapeJobMapper::toResponse);
+		return PageResponseDTO.from(scrapeJobRepository.findBySource(source, pageable), ScrapeJobMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<ScrapeJobResponse> findByStatus(ScrapeJobStatus status, Pageable pageable) {
-		return PageResponse.from(scrapeJobRepository.findByStatus(status, pageable), scrapeJobMapper::toResponse);
+	public PageResponseDTO<ScrapeJobResponseDTO> findByStatus(ScrapeJobStatus status, Pageable pageable) {
+		return PageResponseDTO.from(scrapeJobRepository.findByStatus(status, pageable), ScrapeJobMapper::toResponse);
 	}
 
 	@Transactional
-	public ScrapeJobResponse start(UUID id) {
+	public ScrapeJobResponseDTO start(UUID id) {
 		ScrapeJob scrapeJob = getEntity(id);
 		if (scrapeJob.getStatus() != ScrapeJobStatus.PENDING) {
 			throw new BadRequestException("Only PENDING scrape jobs can be started");
@@ -81,11 +80,11 @@ public class ScrapeJobService {
 		scrapeJob.setStartedAt(OffsetDateTime.now());
 		scrapeJob.setFinishedAt(null);
 		scrapeJob.setErrorMessage(null);
-		return scrapeJobMapper.toResponse(scrapeJob);
+		return ScrapeJobMapper.toResponse(scrapeJob);
 	}
 
 	@Transactional
-	public ScrapeJobResponse complete(UUID id, ScrapeJobCompleteRequest request) {
+	public ScrapeJobResponseDTO complete(UUID id, CompleteScrapeJobRequestDTO request) {
 		ScrapeJob scrapeJob = getEntity(id);
 		if (scrapeJob.getStatus() != ScrapeJobStatus.RUNNING) {
 			throw new BadRequestException("Only RUNNING scrape jobs can be completed");
@@ -98,11 +97,11 @@ public class ScrapeJobService {
 		scrapeJob.setPostsFound(request.postsFound());
 		scrapeJob.setPostsSaved(request.postsSaved());
 		scrapeJob.setErrorMessage(null);
-		return scrapeJobMapper.toResponse(scrapeJob);
+		return ScrapeJobMapper.toResponse(scrapeJob);
 	}
 
 	@Transactional
-	public ScrapeJobResponse fail(UUID id, ScrapeJobFailRequest request) {
+	public ScrapeJobResponseDTO fail(UUID id, FailScrapeJobRequestDTO request) {
 		ScrapeJob scrapeJob = getEntity(id);
 		if (scrapeJob.getStatus() != ScrapeJobStatus.PENDING && scrapeJob.getStatus() != ScrapeJobStatus.RUNNING) {
 			throw new BadRequestException("Only PENDING or RUNNING scrape jobs can be failed");
@@ -110,7 +109,7 @@ public class ScrapeJobService {
 		scrapeJob.setStatus(ScrapeJobStatus.FAILED);
 		scrapeJob.setFinishedAt(OffsetDateTime.now());
 		scrapeJob.setErrorMessage(request.errorMessage().trim());
-		return scrapeJobMapper.toResponse(scrapeJob);
+		return ScrapeJobMapper.toResponse(scrapeJob);
 	}
 
 	@Transactional

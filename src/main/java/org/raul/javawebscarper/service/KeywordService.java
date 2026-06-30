@@ -1,9 +1,10 @@
 package org.raul.javawebscarper.service;
 
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.common.PageResponse;
-import org.raul.javawebscarper.api.keyword.KeywordRequest;
-import org.raul.javawebscarper.api.keyword.KeywordResponse;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
+import org.raul.javawebscarper.dto.request.keyword.CreateKeywordRequestDTO;
+import org.raul.javawebscarper.dto.request.keyword.UpdateKeywordRequestDTO;
+import org.raul.javawebscarper.dto.response.keyword.KeywordResponseDTO;
 import org.raul.javawebscarper.exception.BadRequestException;
 import org.raul.javawebscarper.exception.DuplicateResourceException;
 import org.raul.javawebscarper.exception.ResourceNotFoundException;
@@ -23,51 +24,50 @@ public class KeywordService {
 	private final KeywordRepository keywordRepository;
 	private final PostKeywordRepository postKeywordRepository;
 	private final ScrapeJobRepository scrapeJobRepository;
-	private final KeywordMapper keywordMapper;
 
 	@Transactional
-	public KeywordResponse create(KeywordRequest request) {
+	public KeywordResponseDTO create(CreateKeywordRequestDTO request) {
 		String word = normalize(request.word());
 		if (keywordRepository.existsByWord(word)) {
 			throw new DuplicateResourceException("Keyword '%s' already exists".formatted(word));
 		}
-		Keyword keyword = keywordMapper.toEntity(request);
-		return keywordMapper.toResponse(keywordRepository.save(keyword));
+		Keyword keyword = KeywordMapper.toEntity(request);
+		return KeywordMapper.toResponse(keywordRepository.save(keyword));
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<KeywordResponse> findAll(Pageable pageable) {
-		return PageResponse.from(keywordRepository.findAll(pageable), keywordMapper::toResponse);
+	public PageResponseDTO<KeywordResponseDTO> findAll(Pageable pageable) {
+		return PageResponseDTO.from(keywordRepository.findAll(pageable), KeywordMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public KeywordResponse findById(Integer id) {
-		return keywordMapper.toResponse(getEntity(id));
+	public KeywordResponseDTO findById(Integer id) {
+		return KeywordMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional
-	public KeywordResponse update(Integer id, KeywordRequest request) {
+	public KeywordResponseDTO update(Integer id, UpdateKeywordRequestDTO request) {
 		Keyword keyword = getEntity(id);
 		String word = normalize(request.word());
 		if (keywordRepository.existsByWordAndIdNot(word, id)) {
 			throw new DuplicateResourceException("Keyword '%s' already exists".formatted(word));
 		}
-		keywordMapper.updateEntity(keyword, request);
-		return keywordMapper.toResponse(keyword);
+		KeywordMapper.updateEntity(keyword, request);
+		return KeywordMapper.toResponse(keyword);
 	}
 
 	@Transactional
-	public KeywordResponse enable(Integer id) {
+	public KeywordResponseDTO enable(Integer id) {
 		Keyword keyword = getEntity(id);
 		keyword.setEnabled(true);
-		return keywordMapper.toResponse(keyword);
+		return KeywordMapper.toResponse(keyword);
 	}
 
 	@Transactional
-	public KeywordResponse disable(Integer id) {
+	public KeywordResponseDTO disable(Integer id) {
 		Keyword keyword = getEntity(id);
 		keyword.setEnabled(false);
-		return keywordMapper.toResponse(keyword);
+		return KeywordMapper.toResponse(keyword);
 	}
 
 	@Transactional

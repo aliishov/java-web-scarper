@@ -1,25 +1,27 @@
 package org.raul.javawebscarper.mapper;
 
-import org.raul.javawebscarper.api.post.PostKeywordResponse;
-import org.raul.javawebscarper.api.post.PostMediaResponse;
-import org.raul.javawebscarper.api.post.PostRequest;
-import org.raul.javawebscarper.api.post.PostResponse;
+import org.raul.javawebscarper.dto.response.post.PostKeywordResponseDTO;
+import org.raul.javawebscarper.dto.response.post.PostMediaResponseDTO;
+import org.raul.javawebscarper.dto.request.post.CreatePostRequestDTO;
+import org.raul.javawebscarper.dto.request.post.UpdatePostRequestDTO;
+import org.raul.javawebscarper.dto.response.post.PostResponseDTO;
 import org.raul.javawebscarper.model.Author;
 import org.raul.javawebscarper.model.Post;
 import org.raul.javawebscarper.model.PostKeyword;
 import org.raul.javawebscarper.model.PostMedia;
 import org.raul.javawebscarper.model.Source;
-import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 
-@Component
-public class PostMapper {
+public final class PostMapper {
 
-	public Post toEntity(PostRequest request, Source source, Author author) {
+	private PostMapper() {
+	}
+
+	public static Post toEntity(CreatePostRequestDTO request, Source source, Author author) {
 		return Post.builder()
 				.source(source)
 				.author(author)
@@ -35,7 +37,7 @@ public class PostMapper {
 				.build();
 	}
 
-	public void updateEntity(Post post, PostRequest request, Source source, Author author) {
+	public static void updateEntity(Post post, UpdatePostRequestDTO request, Source source, Author author) {
 		post.setSource(source);
 		post.setAuthor(author);
 		post.setExternalPostId(nullIfBlank(request.externalPostId()));
@@ -47,8 +49,8 @@ public class PostMapper {
 		post.setLanguage(nullIfBlank(request.language()));
 	}
 
-	public PostResponse toResponse(Post post) {
-		return new PostResponse(
+	public static PostResponseDTO toResponse(Post post) {
+		return new PostResponseDTO(
 				post.getId(),
 				post.getSource().getId(),
 				post.getSource().getCode(),
@@ -63,19 +65,19 @@ public class PostMapper {
 				post.getLanguage(),
 				post.getMedia().stream()
 						.sorted(Comparator.comparing(PostMedia::getPosition))
-						.map(this::toMediaResponse)
+						.map(PostMapper::toMediaResponse)
 						.toList(),
 				post.getKeywords().stream()
 						.sorted(Comparator.comparing(postKeyword -> postKeyword.getKeyword().getWord()))
-						.map(this::toKeywordResponse)
+						.map(PostMapper::toKeywordResponse)
 						.toList(),
 				post.getCreatedAt(),
 				post.getUpdatedAt()
 		);
 	}
 
-	private PostMediaResponse toMediaResponse(PostMedia postMedia) {
-		return new PostMediaResponse(
+	private static PostMediaResponseDTO toMediaResponse(PostMedia postMedia) {
+		return new PostMediaResponseDTO(
 				postMedia.getId(),
 				postMedia.getMediaUrl(),
 				postMedia.getMediaType(),
@@ -84,8 +86,8 @@ public class PostMapper {
 		);
 	}
 
-	private PostKeywordResponse toKeywordResponse(PostKeyword postKeyword) {
-		return new PostKeywordResponse(
+	private static PostKeywordResponseDTO toKeywordResponse(PostKeyword postKeyword) {
+		return new PostKeywordResponseDTO(
 				postKeyword.getId(),
 				postKeyword.getKeyword().getId(),
 				postKeyword.getKeyword().getWord(),
@@ -94,7 +96,7 @@ public class PostMapper {
 		);
 	}
 
-	private String nullIfBlank(String value) {
+	private static String nullIfBlank(String value) {
 		if (value == null || value.isBlank()) {
 			return null;
 		}

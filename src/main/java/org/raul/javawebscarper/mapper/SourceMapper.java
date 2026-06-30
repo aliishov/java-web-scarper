@@ -1,14 +1,16 @@
 package org.raul.javawebscarper.mapper;
 
-import org.raul.javawebscarper.api.source.SourceRequest;
-import org.raul.javawebscarper.api.source.SourceResponse;
+import org.raul.javawebscarper.dto.request.source.CreateSourceRequestDTO;
+import org.raul.javawebscarper.dto.request.source.UpdateSourceRequestDTO;
+import org.raul.javawebscarper.dto.response.source.SourceResponseDTO;
 import org.raul.javawebscarper.model.Source;
-import org.springframework.stereotype.Component;
 
-@Component
-public class SourceMapper {
+public final class SourceMapper {
 
-	public Source toEntity(SourceRequest request) {
+	private SourceMapper() {
+	}
+
+	public static Source toEntity(CreateSourceRequestDTO request) {
 		return Source.builder()
 				.code(normalize(request.code()))
 				.name(request.name().trim())
@@ -18,7 +20,7 @@ public class SourceMapper {
 				.build();
 	}
 
-	public void updateEntity(Source source, SourceRequest request) {
+	public static void updateEntity(Source source, UpdateSourceRequestDTO request) {
 		source.setCode(normalize(request.code()));
 		source.setName(request.name().trim());
 		source.setType(request.type());
@@ -26,8 +28,8 @@ public class SourceMapper {
 		source.setEnabled(request.enabled() == null || request.enabled());
 	}
 
-	public SourceResponse toResponse(Source source) {
-		return new SourceResponse(
+	public static SourceResponseDTO toResponse(Source source) {
+		return new SourceResponseDTO(
 				source.getId(),
 				source.getCode(),
 				source.getName(),
@@ -39,7 +41,7 @@ public class SourceMapper {
 		);
 	}
 
-	private String normalize(String value) {
+	private static String normalize(String value) {
 		return value.trim().toLowerCase();
 	}
 }
