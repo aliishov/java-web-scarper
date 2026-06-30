@@ -1,9 +1,13 @@
-package org.raul.javawebscarper.api.scrapejob;
+package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.raul.javawebscarper.api.common.PageRequestFactory;
 import org.raul.javawebscarper.api.common.PageResponse;
+import org.raul.javawebscarper.api.scrapejob.ScrapeJobCompleteRequest;
+import org.raul.javawebscarper.api.scrapejob.ScrapeJobFailRequest;
+import org.raul.javawebscarper.api.scrapejob.ScrapeJobRequest;
+import org.raul.javawebscarper.api.scrapejob.ScrapeJobResponse;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.springframework.data.domain.Pageable;
@@ -108,3 +112,4 @@ public class ScrapeJobController {
 		scrapeJobService.delete(id);
 	}
 }
+

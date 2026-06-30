@@ -1,9 +1,11 @@
-package org.raul.javawebscarper.api.source;
+package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.raul.javawebscarper.api.common.PageRequestFactory;
 import org.raul.javawebscarper.api.common.PageResponse;
+import org.raul.javawebscarper.api.source.SourceRequest;
+import org.raul.javawebscarper.api.source.SourceResponse;
 import org.raul.javawebscarper.service.SourceService;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Pageable;
@@ -72,3 +74,4 @@ public class SourceController {
 		sourceService.delete(id);
 	}
 }
+

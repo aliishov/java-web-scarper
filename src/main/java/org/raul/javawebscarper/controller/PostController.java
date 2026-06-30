@@ -1,9 +1,11 @@
-package org.raul.javawebscarper.api.post;
+package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.raul.javawebscarper.api.common.PageRequestFactory;
 import org.raul.javawebscarper.api.common.PageResponse;
+import org.raul.javawebscarper.api.post.PostRequest;
+import org.raul.javawebscarper.api.post.PostResponse;
 import org.raul.javawebscarper.service.PostService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -109,3 +111,4 @@ public class PostController {
 		postService.delete(id);
 	}
 }
+
