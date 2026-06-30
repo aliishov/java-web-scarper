@@ -26,30 +26,29 @@ public class AuthorService {
 	private final AuthorRepository authorRepository;
 	private final PostRepository postRepository;
 	private final SourceService sourceService;
-	private final AuthorMapper authorMapper;
 
 	@Transactional
 	public AuthorResponseDTO create(CreateAuthorRequestDTO request) {
 		Source source = sourceService.getEntity(request.sourceId());
 		validateUniqueNaturalKeys(source, request.externalId(), request.username(), request.profileUrl(), null);
-		Author author = authorMapper.toEntity(request, source);
-		return authorMapper.toResponse(authorRepository.save(author));
+		Author author = AuthorMapper.toEntity(request, source);
+		return AuthorMapper.toResponse(authorRepository.save(author));
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponseDTO<AuthorResponseDTO> findAll(Pageable pageable) {
-		return PageResponseDTO.from(authorRepository.findAll(pageable), authorMapper::toResponse);
+		return PageResponseDTO.from(authorRepository.findAll(pageable), AuthorMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponseDTO<AuthorResponseDTO> findBySource(Integer sourceId, Pageable pageable) {
 		Source source = sourceService.getEntity(sourceId);
-		return PageResponseDTO.from(authorRepository.findBySource(source, pageable), authorMapper::toResponse);
+		return PageResponseDTO.from(authorRepository.findBySource(source, pageable), AuthorMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
 	public AuthorResponseDTO findById(UUID id) {
-		return authorMapper.toResponse(getEntity(id));
+		return AuthorMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional
@@ -57,8 +56,8 @@ public class AuthorService {
 		Author author = getEntity(id);
 		Source source = sourceService.getEntity(request.sourceId());
 		validateUniqueNaturalKeys(source, request.externalId(), request.username(), request.profileUrl(), id);
-		authorMapper.updateEntity(author, request, source);
-		return authorMapper.toResponse(author);
+		AuthorMapper.updateEntity(author, request, source);
+		return AuthorMapper.toResponse(author);
 	}
 
 	@Transactional

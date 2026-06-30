@@ -4,24 +4,25 @@ import org.raul.javawebscarper.dto.request.keyword.CreateKeywordRequestDTO;
 import org.raul.javawebscarper.dto.request.keyword.UpdateKeywordRequestDTO;
 import org.raul.javawebscarper.dto.response.keyword.KeywordResponseDTO;
 import org.raul.javawebscarper.model.Keyword;
-import org.springframework.stereotype.Component;
 
-@Component
-public class KeywordMapper {
+public final class KeywordMapper {
 
-	public Keyword toEntity(CreateKeywordRequestDTO request) {
+	private KeywordMapper() {
+	}
+
+	public static Keyword toEntity(CreateKeywordRequestDTO request) {
 		return Keyword.builder()
 				.word(normalize(request.word()))
 				.enabled(request.enabled() == null || request.enabled())
 				.build();
 	}
 
-	public void updateEntity(Keyword keyword, UpdateKeywordRequestDTO request) {
+	public static void updateEntity(Keyword keyword, UpdateKeywordRequestDTO request) {
 		keyword.setWord(normalize(request.word()));
 		keyword.setEnabled(request.enabled() == null || request.enabled());
 	}
 
-	public KeywordResponseDTO toResponse(Keyword keyword) {
+	public static KeywordResponseDTO toResponse(Keyword keyword) {
 		return new KeywordResponseDTO(
 				keyword.getId(),
 				keyword.getWord(),
@@ -31,7 +32,7 @@ public class KeywordMapper {
 		);
 	}
 
-	private String normalize(String value) {
+	private static String normalize(String value) {
 		return value.trim().toLowerCase();
 	}
 }

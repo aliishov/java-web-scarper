@@ -38,7 +38,6 @@ public class PostService {
 	private final SourceService sourceService;
 	private final AuthorService authorService;
 	private final KeywordService keywordService;
-	private final PostMapper postMapper;
 
 	@Transactional
 	public PostResponseDTO create(CreatePostRequestDTO request) {
@@ -47,10 +46,10 @@ public class PostService {
 		validateAuthorSource(source, author);
 		validateDuplicatePost(source, request.externalPostId(), request.postUrl(), request.textHash(), null);
 
-		Post post = postMapper.toEntity(request, source, author);
+		Post post = PostMapper.toEntity(request, source, author);
 		replaceMedia(post, request.media());
 		replaceKeywords(post, request.keywords());
-		return postMapper.toResponse(postRepository.save(post));
+		return PostMapper.toResponse(postRepository.save(post));
 	}
 
 	@Transactional(readOnly = true)
@@ -65,30 +64,30 @@ public class PostService {
 	) {
 		validateDateRange(dateFrom, dateTo);
 		Specification<Post> specification = buildSpecification(sourceId, authorId, keywordId, dateFrom, dateTo, search);
-		return PageResponseDTO.from(postRepository.findAll(specification, pageable), postMapper::toResponse);
+		return PageResponseDTO.from(postRepository.findAll(specification, pageable), PostMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
 	public PostResponseDTO findById(UUID id) {
-		return postMapper.toResponse(getEntity(id));
+		return PostMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponseDTO<PostResponseDTO> findBySource(Integer sourceId, Pageable pageable) {
 		Source source = sourceService.getEntity(sourceId);
-		return PageResponseDTO.from(postRepository.findBySource(source, pageable), postMapper::toResponse);
+		return PageResponseDTO.from(postRepository.findBySource(source, pageable), PostMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponseDTO<PostResponseDTO> findByAuthor(UUID authorId, Pageable pageable) {
 		Author author = authorService.getEntity(authorId);
-		return PageResponseDTO.from(postRepository.findByAuthor(author, pageable), postMapper::toResponse);
+		return PageResponseDTO.from(postRepository.findByAuthor(author, pageable), PostMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponseDTO<PostResponseDTO> findByKeyword(Integer keywordId, Pageable pageable) {
 		Keyword keyword = keywordService.getEntity(keywordId);
-		return PageResponseDTO.from(postRepository.findByKeyword(keyword, pageable), postMapper::toResponse);
+		return PageResponseDTO.from(postRepository.findByKeyword(keyword, pageable), PostMapper::toResponse);
 	}
 
 	@Transactional
@@ -99,10 +98,10 @@ public class PostService {
 		validateAuthorSource(source, author);
 		validateDuplicatePost(source, request.externalPostId(), request.postUrl(), request.textHash(), id);
 
-		postMapper.updateEntity(post, request, source, author);
+		PostMapper.updateEntity(post, request, source, author);
 		replaceMedia(post, request.media());
 		replaceKeywords(post, request.keywords());
-		return postMapper.toResponse(post);
+		return PostMapper.toResponse(post);
 	}
 
 	@Transactional

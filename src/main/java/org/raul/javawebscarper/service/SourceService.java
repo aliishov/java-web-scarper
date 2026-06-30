@@ -26,7 +26,6 @@ public class SourceService {
 	private final AuthorRepository authorRepository;
 	private final PostRepository postRepository;
 	private final ScrapeJobRepository scrapeJobRepository;
-	private final SourceMapper sourceMapper;
 
 	@Transactional
 	public SourceResponseDTO create(CreateSourceRequestDTO request) {
@@ -34,18 +33,18 @@ public class SourceService {
 		if (sourceRepository.existsByCode(code)) {
 			throw new DuplicateResourceException("Source with code '%s' already exists".formatted(code));
 		}
-		Source source = sourceMapper.toEntity(request);
-		return sourceMapper.toResponse(sourceRepository.save(source));
+		Source source = SourceMapper.toEntity(request);
+		return SourceMapper.toResponse(sourceRepository.save(source));
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponseDTO<SourceResponseDTO> findAll(Pageable pageable) {
-		return PageResponseDTO.from(sourceRepository.findAll(pageable), sourceMapper::toResponse);
+		return PageResponseDTO.from(sourceRepository.findAll(pageable), SourceMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
 	public SourceResponseDTO findById(Integer id) {
-		return sourceMapper.toResponse(getEntity(id));
+		return SourceMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional
@@ -55,22 +54,22 @@ public class SourceService {
 		if (sourceRepository.existsByCodeAndIdNot(code, id)) {
 			throw new DuplicateResourceException("Source with code '%s' already exists".formatted(code));
 		}
-		sourceMapper.updateEntity(source, request);
-		return sourceMapper.toResponse(source);
+		SourceMapper.updateEntity(source, request);
+		return SourceMapper.toResponse(source);
 	}
 
 	@Transactional
 	public SourceResponseDTO enable(Integer id) {
 		Source source = getEntity(id);
 		source.setEnabled(true);
-		return sourceMapper.toResponse(source);
+		return SourceMapper.toResponse(source);
 	}
 
 	@Transactional
 	public SourceResponseDTO disable(Integer id) {
 		Source source = getEntity(id);
 		source.setEnabled(false);
-		return sourceMapper.toResponse(source);
+		return SourceMapper.toResponse(source);
 	}
 
 	@Transactional

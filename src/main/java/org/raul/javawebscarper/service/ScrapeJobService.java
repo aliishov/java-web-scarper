@@ -30,15 +30,14 @@ public class ScrapeJobService {
 	private final ScrapeJobRepository scrapeJobRepository;
 	private final SourceService sourceService;
 	private final KeywordService keywordService;
-	private final ScrapeJobMapper scrapeJobMapper;
 
 	@Transactional
 	public ScrapeJobResponseDTO create(CreateScrapeJobRequestDTO request) {
 		validateDateRange(request.dateFrom(), request.dateTo());
 		Source source = sourceService.getEntity(request.sourceId());
 		Keyword keyword = keywordService.getEntity(request.keywordId());
-		ScrapeJob scrapeJob = scrapeJobMapper.toEntity(request, source, keyword);
-		return scrapeJobMapper.toResponse(scrapeJobRepository.save(scrapeJob));
+		ScrapeJob scrapeJob = ScrapeJobMapper.toEntity(request, source, keyword);
+		return ScrapeJobMapper.toResponse(scrapeJobRepository.save(scrapeJob));
 	}
 
 	@Transactional(readOnly = true)
@@ -52,23 +51,23 @@ public class ScrapeJobService {
 	) {
 		validateDateRange(dateFrom, dateTo);
 		Specification<ScrapeJob> specification = buildSpecification(sourceId, keywordId, status, dateFrom, dateTo);
-		return PageResponseDTO.from(scrapeJobRepository.findAll(specification, pageable), scrapeJobMapper::toResponse);
+		return PageResponseDTO.from(scrapeJobRepository.findAll(specification, pageable), ScrapeJobMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
 	public ScrapeJobResponseDTO findById(UUID id) {
-		return scrapeJobMapper.toResponse(getEntity(id));
+		return ScrapeJobMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponseDTO<ScrapeJobResponseDTO> findBySource(Integer sourceId, Pageable pageable) {
 		Source source = sourceService.getEntity(sourceId);
-		return PageResponseDTO.from(scrapeJobRepository.findBySource(source, pageable), scrapeJobMapper::toResponse);
+		return PageResponseDTO.from(scrapeJobRepository.findBySource(source, pageable), ScrapeJobMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
 	public PageResponseDTO<ScrapeJobResponseDTO> findByStatus(ScrapeJobStatus status, Pageable pageable) {
-		return PageResponseDTO.from(scrapeJobRepository.findByStatus(status, pageable), scrapeJobMapper::toResponse);
+		return PageResponseDTO.from(scrapeJobRepository.findByStatus(status, pageable), ScrapeJobMapper::toResponse);
 	}
 
 	@Transactional
@@ -81,7 +80,7 @@ public class ScrapeJobService {
 		scrapeJob.setStartedAt(OffsetDateTime.now());
 		scrapeJob.setFinishedAt(null);
 		scrapeJob.setErrorMessage(null);
-		return scrapeJobMapper.toResponse(scrapeJob);
+		return ScrapeJobMapper.toResponse(scrapeJob);
 	}
 
 	@Transactional
@@ -98,7 +97,7 @@ public class ScrapeJobService {
 		scrapeJob.setPostsFound(request.postsFound());
 		scrapeJob.setPostsSaved(request.postsSaved());
 		scrapeJob.setErrorMessage(null);
-		return scrapeJobMapper.toResponse(scrapeJob);
+		return ScrapeJobMapper.toResponse(scrapeJob);
 	}
 
 	@Transactional
@@ -110,7 +109,7 @@ public class ScrapeJobService {
 		scrapeJob.setStatus(ScrapeJobStatus.FAILED);
 		scrapeJob.setFinishedAt(OffsetDateTime.now());
 		scrapeJob.setErrorMessage(request.errorMessage().trim());
-		return scrapeJobMapper.toResponse(scrapeJob);
+		return ScrapeJobMapper.toResponse(scrapeJob);
 	}
 
 	@Transactional
