@@ -72,8 +72,9 @@ CREATE TABLE core.posts (
 	CONSTRAINT pk_posts PRIMARY KEY (id),
 	CONSTRAINT fk_posts_source FOREIGN KEY (source_id) REFERENCES core.sources (id),
 	CONSTRAINT fk_posts_author FOREIGN KEY (author_id) REFERENCES core.authors (id),
-	CONSTRAINT uq_posts_post_url UNIQUE (post_url),
-	CONSTRAINT uq_posts_source_external_post_id UNIQUE (source_id, external_post_id)
+	CONSTRAINT uq_posts_source_post_url UNIQUE (source_id, post_url),
+	CONSTRAINT uq_posts_source_external_post_id UNIQUE (source_id, external_post_id),
+	CONSTRAINT uq_posts_source_text_hash UNIQUE (source_id, text_hash)
 );
 
 CREATE INDEX idx_posts_source_post_date ON core.posts (source_id, post_date);

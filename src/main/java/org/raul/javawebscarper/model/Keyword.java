@@ -47,7 +47,7 @@ public class Keyword extends BaseEntity {
 	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "kw_seq")
 	Integer id;
 
-	@Column(name = "word", nullable = false, updatable = false)
+	@Column(name = "word", nullable = false)
 	String word;
 
 	@Column(name = "is_enabled", nullable = false)

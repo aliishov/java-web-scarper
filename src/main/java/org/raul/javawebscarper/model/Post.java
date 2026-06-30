@@ -38,8 +38,9 @@ import java.util.UUID;
 		name = "posts",
 		schema = "core",
 		uniqueConstraints = {
-				@UniqueConstraint(name = "uq_posts_post_url", columnNames = "post_url"),
-				@UniqueConstraint(name = "uq_posts_source_external_post_id", columnNames = {"source_id", "external_post_id"})
+				@UniqueConstraint(name = "uq_posts_source_post_url", columnNames = {"source_id", "post_url"}),
+				@UniqueConstraint(name = "uq_posts_source_external_post_id", columnNames = {"source_id", "external_post_id"}),
+				@UniqueConstraint(name = "uq_posts_source_text_hash", columnNames = {"source_id", "text_hash"})
 		},
 		indexes = {
 				@Index(name = "idx_posts_source_post_date", columnList = "source_id,post_date"),
@@ -63,29 +64,29 @@ public class Post extends BaseEntity {
 	UUID id;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "source_id", nullable = false, updatable = false)
+	@JoinColumn(name = "source_id", nullable = false)
 	Source source;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "author_id", nullable = false, updatable = false)
+	@JoinColumn(name = "author_id", nullable = false)
 	Author author;
 
-	@Column(name = "external_post_id", updatable = false)
+	@Column(name = "external_post_id")
 	String externalPostId;
 
-	@Column(name = "post_url", nullable = false, updatable = false, columnDefinition = "TEXT")
+	@Column(name = "post_url", nullable = false, columnDefinition = "TEXT")
 	String postUrl;
 
-	@Column(name = "post_date", nullable = false, updatable = false)
+	@Column(name = "post_date", nullable = false)
 	OffsetDateTime postDate;
 
-	@Column(name = "scraped_at", nullable = false, updatable = false)
+	@Column(name = "scraped_at", nullable = false)
 	OffsetDateTime scrapedAt;
 
-	@Column(name = "text", nullable = false, updatable = false, columnDefinition = "TEXT")
+	@Column(name = "text", nullable = false, columnDefinition = "TEXT")
 	String text;
 
-	@Column(name = "text_hash", nullable = false, updatable = false, length = 128)
+	@Column(name = "text_hash", nullable = false, length = 128)
 	String textHash;
 
 	@Column(name = "language", length = 16)

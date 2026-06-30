@@ -15,5 +15,7 @@ public interface SourceRepository extends JpaRepository<Source, Integer> {
 
 	boolean existsByCode(String code);
 
+	boolean existsByCodeAndIdNot(String code, Integer id);
+
 	List<Source> findByEnabledTrue();
 }

@@ -1,0 +1,27 @@
+package org.raul.javawebscarper.api.source;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.hibernate.validator.constraints.URL;
+import org.raul.javawebscarper.model.enumerated.SourceType;
+
+public record SourceRequest(
+		@NotBlank
+		@Size(max = 100)
+		String code,
+
+		@NotBlank
+		@Size(max = 255)
+		String name,
+
+		@NotNull
+		SourceType type,
+
+		@NotBlank
+		@URL
+		String baseUrl,
+
+		Boolean enabled
+) {
+}

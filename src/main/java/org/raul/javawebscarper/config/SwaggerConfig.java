@@ -11,8 +11,8 @@ import io.swagger.v3.oas.annotations.info.Info;
 						email = "alishov7394@gmail.com",
 						url = "https://github.com/aliishov/java-web-scarper"
 				),
-				description = "OpenApi Documentation",
-				title = "Authentication Service",
+				description = "News and social publication scraping backend API",
+				title = "Java Web Scarper API",
 				version = "1.0"
 		)
 )
