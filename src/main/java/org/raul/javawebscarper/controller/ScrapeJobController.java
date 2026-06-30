@@ -2,6 +2,7 @@ package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.raul.javawebscarper.dto.common.BaseResponseDTO;
 import org.raul.javawebscarper.util.PageRequestFactory;
 import org.raul.javawebscarper.dto.common.PageResponseDTO;
 import org.raul.javawebscarper.dto.request.scrapejob.CompleteScrapeJobRequestDTO;
@@ -13,6 +14,7 @@ import org.raul.javawebscarper.service.ScrapeJobService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -21,7 +23,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
@@ -35,13 +36,16 @@ public class ScrapeJobController {
 	private final ScrapeJobService scrapeJobService;
 
 	@PostMapping
-	@ResponseStatus(HttpStatus.CREATED)
-	public ScrapeJobResponseDTO create(@Valid @RequestBody CreateScrapeJobRequestDTO request) {
-		return scrapeJobService.create(request);
+	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> create(
+			@Valid @RequestBody CreateScrapeJobRequestDTO request
+	) {
+		ScrapeJobResponseDTO response = scrapeJobService.create(request);
+		return ResponseEntity.status(HttpStatus.CREATED)
+				.body(BaseResponseDTO.success(response, "Scrape job created successfully"));
 	}
 
 	@GetMapping
-	public PageResponseDTO<ScrapeJobResponseDTO> findAll(
+	public ResponseEntity<BaseResponseDTO<PageResponseDTO<ScrapeJobResponseDTO>>> findAll(
 			@RequestParam(required = false) Integer sourceId,
 			@RequestParam(required = false) Integer keywordId,
 			@RequestParam(required = false) ScrapeJobStatus status,
@@ -53,16 +57,17 @@ public class ScrapeJobController {
 			@RequestParam(defaultValue = "DESC") String direction
 	) {
 		Pageable pageable = PageRequestFactory.create(page, size, sortBy, direction);
-		return scrapeJobService.findAll(sourceId, keywordId, status, dateFrom, dateTo, pageable);
+		return ResponseEntity.ok(BaseResponseDTO.success(
+				scrapeJobService.findAll(sourceId, keywordId, status, dateFrom, dateTo, pageable)));
 	}
 
 	@GetMapping("/{id}")
-	public ScrapeJobResponseDTO findById(@PathVariable UUID id) {
-		return scrapeJobService.findById(id);
+	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> findById(@PathVariable UUID id) {
+		return ResponseEntity.ok(BaseResponseDTO.success(scrapeJobService.findById(id)));
 	}
 
 	@GetMapping("/by-source/{sourceId}")
-	public PageResponseDTO<ScrapeJobResponseDTO> findBySource(
+	public ResponseEntity<BaseResponseDTO<PageResponseDTO<ScrapeJobResponseDTO>>> findBySource(
 			@PathVariable Integer sourceId,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -70,11 +75,11 @@ public class ScrapeJobController {
 			@RequestParam(defaultValue = "DESC") String direction
 	) {
 		Pageable pageable = PageRequestFactory.create(page, size, sortBy, direction);
-		return scrapeJobService.findBySource(sourceId, pageable);
+		return ResponseEntity.ok(BaseResponseDTO.success(scrapeJobService.findBySource(sourceId, pageable)));
 	}
 
 	@GetMapping("/by-status/{status}")
-	public PageResponseDTO<ScrapeJobResponseDTO> findByStatus(
+	public ResponseEntity<BaseResponseDTO<PageResponseDTO<ScrapeJobResponseDTO>>> findByStatus(
 			@PathVariable ScrapeJobStatus status,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -82,33 +87,36 @@ public class ScrapeJobController {
 			@RequestParam(defaultValue = "DESC") String direction
 	) {
 		Pageable pageable = PageRequestFactory.create(page, size, sortBy, direction);
-		return scrapeJobService.findByStatus(status, pageable);
+		return ResponseEntity.ok(BaseResponseDTO.success(scrapeJobService.findByStatus(status, pageable)));
 	}
 
 	@PatchMapping("/{id}/start")
-	public ScrapeJobResponseDTO start(@PathVariable UUID id) {
-		return scrapeJobService.start(id);
+	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> start(@PathVariable UUID id) {
+		ScrapeJobResponseDTO response = scrapeJobService.start(id);
+		return ResponseEntity.ok(BaseResponseDTO.success(response, "Scrape job started successfully"));
 	}
 
 	@PatchMapping("/{id}/complete")
-	public ScrapeJobResponseDTO complete(
+	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> complete(
 			@PathVariable UUID id,
 			@Valid @RequestBody CompleteScrapeJobRequestDTO request
 	) {
-		return scrapeJobService.complete(id, request);
+		ScrapeJobResponseDTO response = scrapeJobService.complete(id, request);
+		return ResponseEntity.ok(BaseResponseDTO.success(response, "Scrape job completed successfully"));
 	}
 
 	@PatchMapping("/{id}/fail")
-	public ScrapeJobResponseDTO fail(
+	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> fail(
 			@PathVariable UUID id,
 			@Valid @RequestBody FailScrapeJobRequestDTO request
 	) {
-		return scrapeJobService.fail(id, request);
+		ScrapeJobResponseDTO response = scrapeJobService.fail(id, request);
+		return ResponseEntity.ok(BaseResponseDTO.success(response, "Scrape job failed successfully"));
 	}
 
 	@DeleteMapping("/{id}")
-	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void delete(@PathVariable UUID id) {
+	public ResponseEntity<BaseResponseDTO<Void>> delete(@PathVariable UUID id) {
 		scrapeJobService.delete(id);
+		return ResponseEntity.ok(BaseResponseDTO.success("Scrape job deleted successfully"));
 	}
 }

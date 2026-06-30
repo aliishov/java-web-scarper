@@ -2,6 +2,7 @@ package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.raul.javawebscarper.dto.common.BaseResponseDTO;
 import org.raul.javawebscarper.dto.request.author.CreateAuthorRequestDTO;
 import org.raul.javawebscarper.dto.request.author.UpdateAuthorRequestDTO;
 import org.raul.javawebscarper.dto.response.author.AuthorResponseDTO;
@@ -10,6 +11,7 @@ import org.raul.javawebscarper.dto.common.PageResponseDTO;
 import org.raul.javawebscarper.service.AuthorService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,7 +20,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -31,29 +32,30 @@ public class AuthorController {
 	private final AuthorService authorService;
 
 	@PostMapping
-	@ResponseStatus(HttpStatus.CREATED)
-	public AuthorResponseDTO create(@Valid @RequestBody CreateAuthorRequestDTO request) {
-		return authorService.create(request);
+	public ResponseEntity<BaseResponseDTO<AuthorResponseDTO>> create(@Valid @RequestBody CreateAuthorRequestDTO request) {
+		AuthorResponseDTO response = authorService.create(request);
+		return ResponseEntity.status(HttpStatus.CREATED)
+				.body(BaseResponseDTO.success(response, "Author created successfully"));
 	}
 
 	@GetMapping
-	public PageResponseDTO<AuthorResponseDTO> findAll(
+	public ResponseEntity<BaseResponseDTO<PageResponseDTO<AuthorResponseDTO>>> findAll(
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
 			@RequestParam(defaultValue = "id") String sortBy,
 			@RequestParam(defaultValue = "ASC") String direction
 	) {
 		Pageable pageable = PageRequestFactory.create(page, size, sortBy, direction);
-		return authorService.findAll(pageable);
+		return ResponseEntity.ok(BaseResponseDTO.success(authorService.findAll(pageable)));
 	}
 
 	@GetMapping("/{id}")
-	public AuthorResponseDTO findById(@PathVariable UUID id) {
-		return authorService.findById(id);
+	public ResponseEntity<BaseResponseDTO<AuthorResponseDTO>> findById(@PathVariable UUID id) {
+		return ResponseEntity.ok(BaseResponseDTO.success(authorService.findById(id)));
 	}
 
 	@GetMapping("/by-source/{sourceId}")
-	public PageResponseDTO<AuthorResponseDTO> findBySource(
+	public ResponseEntity<BaseResponseDTO<PageResponseDTO<AuthorResponseDTO>>> findBySource(
 			@PathVariable Integer sourceId,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -61,20 +63,21 @@ public class AuthorController {
 			@RequestParam(defaultValue = "ASC") String direction
 	) {
 		Pageable pageable = PageRequestFactory.create(page, size, sortBy, direction);
-		return authorService.findBySource(sourceId, pageable);
+		return ResponseEntity.ok(BaseResponseDTO.success(authorService.findBySource(sourceId, pageable)));
 	}
 
 	@PutMapping("/{id}")
-	public AuthorResponseDTO update(
+	public ResponseEntity<BaseResponseDTO<AuthorResponseDTO>> update(
 			@PathVariable UUID id,
 			@Valid @RequestBody UpdateAuthorRequestDTO request
 	) {
-		return authorService.update(id, request);
+		AuthorResponseDTO response = authorService.update(id, request);
+		return ResponseEntity.ok(BaseResponseDTO.success(response, "Author updated successfully"));
 	}
 
 	@DeleteMapping("/{id}")
-	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void delete(@PathVariable UUID id) {
+	public ResponseEntity<BaseResponseDTO<Void>> delete(@PathVariable UUID id) {
 		authorService.delete(id);
+		return ResponseEntity.ok(BaseResponseDTO.success("Author deleted successfully"));
 	}
 }
