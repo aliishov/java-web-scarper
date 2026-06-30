@@ -15,5 +15,7 @@ public interface KeywordRepository extends JpaRepository<Keyword, Integer> {
 
 	boolean existsByWord(String word);
 
+	boolean existsByWordAndIdNot(String word, Integer id);
+
 	List<Keyword> findByEnabledTrue();
 }
