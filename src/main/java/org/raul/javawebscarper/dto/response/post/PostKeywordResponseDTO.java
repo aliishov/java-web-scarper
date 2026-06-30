@@ -1,8 +1,8 @@
-package org.raul.javawebscarper.api.post;
+package org.raul.javawebscarper.dto.response.post;
 
 import java.time.OffsetDateTime;
 
-public record PostKeywordResponse(
+public record PostKeywordResponseDTO(
 		Integer id,
 		Integer keywordId,
 		String keywordWord,

@@ -1,10 +1,10 @@
-package org.raul.javawebscarper.api.source;
+package org.raul.javawebscarper.dto.response.source;
 
 import org.raul.javawebscarper.model.enumerated.SourceType;
 
 import java.time.OffsetDateTime;
 
-public record SourceResponse(
+public record SourceResponseDTO(
 		Integer id,
 		String code,
 		String name,

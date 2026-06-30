@@ -1,11 +1,11 @@
-package org.raul.javawebscarper.api.common;
+package org.raul.javawebscarper.dto.common;
 
 import org.springframework.data.domain.Page;
 
 import java.util.List;
 import java.util.function.Function;
 
-public record PageResponse<T>(
+public record PageResponseDTO<T>(
 		List<T> content,
 		int page,
 		int size,
@@ -15,8 +15,8 @@ public record PageResponse<T>(
 		boolean last
 ) {
 
-	public static <T, R> PageResponse<R> from(Page<T> page, Function<T, R> mapper) {
-		return new PageResponse<>(
+	public static <T, R> PageResponseDTO<R> from(Page<T> page, Function<T, R> mapper) {
+		return new PageResponseDTO<>(
 				page.getContent().stream().map(mapper).toList(),
 				page.getNumber(),
 				page.getSize(),

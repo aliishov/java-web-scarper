@@ -1,4 +1,4 @@
-package org.raul.javawebscarper.api.post;
+package org.raul.javawebscarper.dto.request.post;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -11,7 +11,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-public record PostRequest(
+public record UpdatePostRequestDTO(
 		@NotNull
 		Integer sourceId,
 
@@ -43,9 +43,9 @@ public record PostRequest(
 		String language,
 
 		@Valid
-		List<PostMediaRequest> media,
+		List<PostMediaRequestDTO> media,
 
 		@Valid
-		List<PostKeywordRequest> keywords
+		List<PostKeywordRequestDTO> keywords
 ) {
 }

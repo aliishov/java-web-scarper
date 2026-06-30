@@ -1,8 +1,8 @@
-package org.raul.javawebscarper.api.keyword;
+package org.raul.javawebscarper.dto.response.keyword;
 
 import java.time.OffsetDateTime;
 
-public record KeywordResponse(
+public record KeywordResponseDTO(
 		Integer id,
 		String word,
 		boolean enabled,

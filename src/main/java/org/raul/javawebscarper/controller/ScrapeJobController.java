@@ -2,12 +2,12 @@ package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.common.PageRequestFactory;
-import org.raul.javawebscarper.api.common.PageResponse;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobCompleteRequest;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobFailRequest;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobRequest;
-import org.raul.javawebscarper.api.scrapejob.ScrapeJobResponse;
+import org.raul.javawebscarper.util.PageRequestFactory;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
+import org.raul.javawebscarper.dto.request.scrapejob.CompleteScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.request.scrapejob.FailScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.request.scrapejob.CreateScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.springframework.data.domain.Pageable;
@@ -36,12 +36,12 @@ public class ScrapeJobController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public ScrapeJobResponse create(@Valid @RequestBody ScrapeJobRequest request) {
+	public ScrapeJobResponseDTO create(@Valid @RequestBody CreateScrapeJobRequestDTO request) {
 		return scrapeJobService.create(request);
 	}
 
 	@GetMapping
-	public PageResponse<ScrapeJobResponse> findAll(
+	public PageResponseDTO<ScrapeJobResponseDTO> findAll(
 			@RequestParam(required = false) Integer sourceId,
 			@RequestParam(required = false) Integer keywordId,
 			@RequestParam(required = false) ScrapeJobStatus status,
@@ -57,12 +57,12 @@ public class ScrapeJobController {
 	}
 
 	@GetMapping("/{id}")
-	public ScrapeJobResponse findById(@PathVariable UUID id) {
+	public ScrapeJobResponseDTO findById(@PathVariable UUID id) {
 		return scrapeJobService.findById(id);
 	}
 
 	@GetMapping("/by-source/{sourceId}")
-	public PageResponse<ScrapeJobResponse> findBySource(
+	public PageResponseDTO<ScrapeJobResponseDTO> findBySource(
 			@PathVariable Integer sourceId,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -74,7 +74,7 @@ public class ScrapeJobController {
 	}
 
 	@GetMapping("/by-status/{status}")
-	public PageResponse<ScrapeJobResponse> findByStatus(
+	public PageResponseDTO<ScrapeJobResponseDTO> findByStatus(
 			@PathVariable ScrapeJobStatus status,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -86,22 +86,22 @@ public class ScrapeJobController {
 	}
 
 	@PatchMapping("/{id}/start")
-	public ScrapeJobResponse start(@PathVariable UUID id) {
+	public ScrapeJobResponseDTO start(@PathVariable UUID id) {
 		return scrapeJobService.start(id);
 	}
 
 	@PatchMapping("/{id}/complete")
-	public ScrapeJobResponse complete(
+	public ScrapeJobResponseDTO complete(
 			@PathVariable UUID id,
-			@Valid @RequestBody ScrapeJobCompleteRequest request
+			@Valid @RequestBody CompleteScrapeJobRequestDTO request
 	) {
 		return scrapeJobService.complete(id, request);
 	}
 
 	@PatchMapping("/{id}/fail")
-	public ScrapeJobResponse fail(
+	public ScrapeJobResponseDTO fail(
 			@PathVariable UUID id,
-			@Valid @RequestBody ScrapeJobFailRequest request
+			@Valid @RequestBody FailScrapeJobRequestDTO request
 	) {
 		return scrapeJobService.fail(id, request);
 	}
@@ -112,4 +112,3 @@ public class ScrapeJobController {
 		scrapeJobService.delete(id);
 	}
 }
-

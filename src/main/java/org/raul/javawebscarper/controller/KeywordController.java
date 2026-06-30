@@ -2,10 +2,11 @@ package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.common.PageRequestFactory;
-import org.raul.javawebscarper.api.common.PageResponse;
-import org.raul.javawebscarper.api.keyword.KeywordRequest;
-import org.raul.javawebscarper.api.keyword.KeywordResponse;
+import org.raul.javawebscarper.util.PageRequestFactory;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
+import org.raul.javawebscarper.dto.request.keyword.CreateKeywordRequestDTO;
+import org.raul.javawebscarper.dto.request.keyword.UpdateKeywordRequestDTO;
+import org.raul.javawebscarper.dto.response.keyword.KeywordResponseDTO;
 import org.raul.javawebscarper.service.KeywordService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -30,12 +31,12 @@ public class KeywordController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public KeywordResponse create(@Valid @RequestBody KeywordRequest request) {
+	public KeywordResponseDTO create(@Valid @RequestBody CreateKeywordRequestDTO request) {
 		return keywordService.create(request);
 	}
 
 	@GetMapping
-	public PageResponse<KeywordResponse> findAll(
+	public PageResponseDTO<KeywordResponseDTO> findAll(
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
 			@RequestParam(defaultValue = "id") String sortBy,
@@ -46,25 +47,25 @@ public class KeywordController {
 	}
 
 	@GetMapping("/{id}")
-	public KeywordResponse findById(@PathVariable Integer id) {
+	public KeywordResponseDTO findById(@PathVariable Integer id) {
 		return keywordService.findById(id);
 	}
 
 	@PutMapping("/{id}")
-	public KeywordResponse update(
+	public KeywordResponseDTO update(
 			@PathVariable Integer id,
-			@Valid @RequestBody KeywordRequest request
+			@Valid @RequestBody UpdateKeywordRequestDTO request
 	) {
 		return keywordService.update(id, request);
 	}
 
 	@PatchMapping("/{id}/enable")
-	public KeywordResponse enable(@PathVariable Integer id) {
+	public KeywordResponseDTO enable(@PathVariable Integer id) {
 		return keywordService.enable(id);
 	}
 
 	@PatchMapping("/{id}/disable")
-	public KeywordResponse disable(@PathVariable Integer id) {
+	public KeywordResponseDTO disable(@PathVariable Integer id) {
 		return keywordService.disable(id);
 	}
 
@@ -74,4 +75,3 @@ public class KeywordController {
 		keywordService.delete(id);
 	}
 }
-

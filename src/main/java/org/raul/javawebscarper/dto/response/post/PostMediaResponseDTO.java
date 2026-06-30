@@ -1,10 +1,10 @@
-package org.raul.javawebscarper.api.post;
+package org.raul.javawebscarper.dto.response.post;
 
 import org.raul.javawebscarper.model.enumerated.MediaType;
 
 import java.time.OffsetDateTime;
 
-public record PostMediaResponse(
+public record PostMediaResponseDTO(
 		Long id,
 		String mediaUrl,
 		MediaType mediaType,

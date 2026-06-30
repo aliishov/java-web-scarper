@@ -2,11 +2,12 @@ package org.raul.javawebscarper.service;
 
 import jakarta.persistence.criteria.Join;
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.common.PageResponse;
-import org.raul.javawebscarper.api.post.PostKeywordRequest;
-import org.raul.javawebscarper.api.post.PostMediaRequest;
-import org.raul.javawebscarper.api.post.PostRequest;
-import org.raul.javawebscarper.api.post.PostResponse;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
+import org.raul.javawebscarper.dto.request.post.PostKeywordRequestDTO;
+import org.raul.javawebscarper.dto.request.post.PostMediaRequestDTO;
+import org.raul.javawebscarper.dto.request.post.CreatePostRequestDTO;
+import org.raul.javawebscarper.dto.request.post.UpdatePostRequestDTO;
+import org.raul.javawebscarper.dto.response.post.PostResponseDTO;
 import org.raul.javawebscarper.exception.BadRequestException;
 import org.raul.javawebscarper.exception.DuplicateResourceException;
 import org.raul.javawebscarper.exception.ResourceNotFoundException;
@@ -40,11 +41,11 @@ public class PostService {
 	private final PostMapper postMapper;
 
 	@Transactional
-	public PostResponse create(PostRequest request) {
+	public PostResponseDTO create(CreatePostRequestDTO request) {
 		Source source = sourceService.getEntity(request.sourceId());
 		Author author = authorService.getEntity(request.authorId());
 		validateAuthorSource(source, author);
-		validateDuplicatePost(source, request, null);
+		validateDuplicatePost(source, request.externalPostId(), request.postUrl(), request.textHash(), null);
 
 		Post post = postMapper.toEntity(request, source, author);
 		replaceMedia(post, request.media());
@@ -53,7 +54,7 @@ public class PostService {
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<PostResponse> findAll(
+	public PageResponseDTO<PostResponseDTO> findAll(
 			Integer sourceId,
 			UUID authorId,
 			Integer keywordId,
@@ -64,39 +65,39 @@ public class PostService {
 	) {
 		validateDateRange(dateFrom, dateTo);
 		Specification<Post> specification = buildSpecification(sourceId, authorId, keywordId, dateFrom, dateTo, search);
-		return PageResponse.from(postRepository.findAll(specification, pageable), postMapper::toResponse);
+		return PageResponseDTO.from(postRepository.findAll(specification, pageable), postMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public PostResponse findById(UUID id) {
+	public PostResponseDTO findById(UUID id) {
 		return postMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<PostResponse> findBySource(Integer sourceId, Pageable pageable) {
+	public PageResponseDTO<PostResponseDTO> findBySource(Integer sourceId, Pageable pageable) {
 		Source source = sourceService.getEntity(sourceId);
-		return PageResponse.from(postRepository.findBySource(source, pageable), postMapper::toResponse);
+		return PageResponseDTO.from(postRepository.findBySource(source, pageable), postMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<PostResponse> findByAuthor(UUID authorId, Pageable pageable) {
+	public PageResponseDTO<PostResponseDTO> findByAuthor(UUID authorId, Pageable pageable) {
 		Author author = authorService.getEntity(authorId);
-		return PageResponse.from(postRepository.findByAuthor(author, pageable), postMapper::toResponse);
+		return PageResponseDTO.from(postRepository.findByAuthor(author, pageable), postMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<PostResponse> findByKeyword(Integer keywordId, Pageable pageable) {
+	public PageResponseDTO<PostResponseDTO> findByKeyword(Integer keywordId, Pageable pageable) {
 		Keyword keyword = keywordService.getEntity(keywordId);
-		return PageResponse.from(postRepository.findByKeyword(keyword, pageable), postMapper::toResponse);
+		return PageResponseDTO.from(postRepository.findByKeyword(keyword, pageable), postMapper::toResponse);
 	}
 
 	@Transactional
-	public PostResponse update(UUID id, PostRequest request) {
+	public PostResponseDTO update(UUID id, UpdatePostRequestDTO request) {
 		Post post = getEntity(id);
 		Source source = sourceService.getEntity(request.sourceId());
 		Author author = authorService.getEntity(request.authorId());
 		validateAuthorSource(source, author);
-		validateDuplicatePost(source, request, id);
+		validateDuplicatePost(source, request.externalPostId(), request.postUrl(), request.textHash(), id);
 
 		postMapper.updateEntity(post, request, source, author);
 		replaceMedia(post, request.media());
@@ -116,7 +117,7 @@ public class PostService {
 				.orElseThrow(() -> new ResourceNotFoundException("Post with id '%s' was not found".formatted(id)));
 	}
 
-	private void replaceMedia(Post post, List<PostMediaRequest> mediaRequests) {
+	private void replaceMedia(Post post, List<PostMediaRequestDTO> mediaRequests) {
 		post.getMedia().clear();
 		if (mediaRequests == null || mediaRequests.isEmpty()) {
 			return;
@@ -124,7 +125,7 @@ public class PostService {
 
 		Set<Integer> positions = new HashSet<>();
 		Set<String> mediaUrls = new HashSet<>();
-		for (PostMediaRequest mediaRequest : mediaRequests) {
+		for (PostMediaRequestDTO mediaRequest : mediaRequests) {
 			String mediaUrl = mediaRequest.mediaUrl().trim();
 			if (!positions.add(mediaRequest.position())) {
 				throw new BadRequestException("Duplicate media position '%s'".formatted(mediaRequest.position()));
@@ -141,14 +142,14 @@ public class PostService {
 		}
 	}
 
-	private void replaceKeywords(Post post, List<PostKeywordRequest> keywordRequests) {
+	private void replaceKeywords(Post post, List<PostKeywordRequestDTO> keywordRequests) {
 		post.getKeywords().clear();
 		if (keywordRequests == null || keywordRequests.isEmpty()) {
 			return;
 		}
 
 		Set<Integer> keywordIds = new HashSet<>();
-		for (PostKeywordRequest keywordRequest : keywordRequests) {
+		for (PostKeywordRequestDTO keywordRequest : keywordRequests) {
 			if (!keywordIds.add(keywordRequest.keywordId())) {
 				throw new BadRequestException("Duplicate keyword id '%s'".formatted(keywordRequest.keywordId()));
 			}
@@ -167,10 +168,16 @@ public class PostService {
 		}
 	}
 
-	private void validateDuplicatePost(Source source, PostRequest request, UUID currentId) {
-		String externalPostId = nullIfBlank(request.externalPostId());
-		String postUrl = request.postUrl().trim();
-		String textHash = request.textHash().trim();
+	private void validateDuplicatePost(
+			Source source,
+			String externalPostIdValue,
+			String postUrlValue,
+			String textHashValue,
+			UUID currentId
+	) {
+		String externalPostId = nullIfBlank(externalPostIdValue);
+		String postUrl = postUrlValue.trim();
+		String textHash = textHashValue.trim();
 
 		if (externalPostId != null && existsExternalPostId(source, externalPostId, currentId)) {
 			throw new DuplicateResourceException("Post externalPostId '%s' already exists for source '%s'"

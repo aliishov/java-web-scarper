@@ -1,9 +1,9 @@
-package org.raul.javawebscarper.api.keyword;
+package org.raul.javawebscarper.dto.request.keyword;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-public record KeywordRequest(
+public record CreateKeywordRequestDTO(
 		@NotBlank
 		@Size(max = 255)
 		String word,

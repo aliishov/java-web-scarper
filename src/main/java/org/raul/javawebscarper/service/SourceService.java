@@ -1,9 +1,10 @@
 package org.raul.javawebscarper.service;
 
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.common.PageResponse;
-import org.raul.javawebscarper.api.source.SourceRequest;
-import org.raul.javawebscarper.api.source.SourceResponse;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
+import org.raul.javawebscarper.dto.request.source.CreateSourceRequestDTO;
+import org.raul.javawebscarper.dto.request.source.UpdateSourceRequestDTO;
+import org.raul.javawebscarper.dto.response.source.SourceResponseDTO;
 import org.raul.javawebscarper.exception.BadRequestException;
 import org.raul.javawebscarper.exception.DuplicateResourceException;
 import org.raul.javawebscarper.exception.ResourceNotFoundException;
@@ -28,7 +29,7 @@ public class SourceService {
 	private final SourceMapper sourceMapper;
 
 	@Transactional
-	public SourceResponse create(SourceRequest request) {
+	public SourceResponseDTO create(CreateSourceRequestDTO request) {
 		String code = normalize(request.code());
 		if (sourceRepository.existsByCode(code)) {
 			throw new DuplicateResourceException("Source with code '%s' already exists".formatted(code));
@@ -38,17 +39,17 @@ public class SourceService {
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<SourceResponse> findAll(Pageable pageable) {
-		return PageResponse.from(sourceRepository.findAll(pageable), sourceMapper::toResponse);
+	public PageResponseDTO<SourceResponseDTO> findAll(Pageable pageable) {
+		return PageResponseDTO.from(sourceRepository.findAll(pageable), sourceMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public SourceResponse findById(Integer id) {
+	public SourceResponseDTO findById(Integer id) {
 		return sourceMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional
-	public SourceResponse update(Integer id, SourceRequest request) {
+	public SourceResponseDTO update(Integer id, UpdateSourceRequestDTO request) {
 		Source source = getEntity(id);
 		String code = normalize(request.code());
 		if (sourceRepository.existsByCodeAndIdNot(code, id)) {
@@ -59,14 +60,14 @@ public class SourceService {
 	}
 
 	@Transactional
-	public SourceResponse enable(Integer id) {
+	public SourceResponseDTO enable(Integer id) {
 		Source source = getEntity(id);
 		source.setEnabled(true);
 		return sourceMapper.toResponse(source);
 	}
 
 	@Transactional
-	public SourceResponse disable(Integer id) {
+	public SourceResponseDTO disable(Integer id) {
 		Source source = getEntity(id);
 		source.setEnabled(false);
 		return sourceMapper.toResponse(source);

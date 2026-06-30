@@ -1,4 +1,4 @@
-package org.raul.javawebscarper.api.post;
+package org.raul.javawebscarper.dto.request.post;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import org.hibernate.validator.constraints.URL;
 import org.raul.javawebscarper.model.enumerated.MediaType;
 
-public record PostMediaRequest(
+public record PostMediaRequestDTO(
 		@NotBlank
 		@URL
 		String mediaUrl,

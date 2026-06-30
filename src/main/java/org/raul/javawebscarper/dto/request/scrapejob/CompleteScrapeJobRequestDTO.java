@@ -1,9 +1,9 @@
-package org.raul.javawebscarper.api.scrapejob;
+package org.raul.javawebscarper.dto.request.scrapejob;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
-public record ScrapeJobCompleteRequest(
+public record CompleteScrapeJobRequestDTO(
 		@NotNull
 		@Min(0)
 		Integer postsFound,

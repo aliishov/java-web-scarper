@@ -1,9 +1,9 @@
-package org.raul.javawebscarper.api.author;
+package org.raul.javawebscarper.dto.response.author;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public record AuthorResponse(
+public record AuthorResponseDTO(
 		UUID id,
 		Integer sourceId,
 		String sourceCode,

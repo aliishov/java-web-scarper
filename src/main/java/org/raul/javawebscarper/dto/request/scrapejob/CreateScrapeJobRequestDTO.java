@@ -1,10 +1,10 @@
-package org.raul.javawebscarper.api.scrapejob;
+package org.raul.javawebscarper.dto.request.scrapejob;
 
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
 
-public record ScrapeJobRequest(
+public record CreateScrapeJobRequestDTO(
 		@NotNull
 		Integer sourceId,
 

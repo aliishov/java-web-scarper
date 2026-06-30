@@ -1,10 +1,10 @@
-package org.raul.javawebscarper.api.post;
+package org.raul.javawebscarper.dto.response.post;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-public record PostResponse(
+public record PostResponseDTO(
 		UUID id,
 		Integer sourceId,
 		String sourceCode,
@@ -17,8 +17,8 @@ public record PostResponse(
 		String text,
 		String textHash,
 		String language,
-		List<PostMediaResponse> media,
-		List<PostKeywordResponse> keywords,
+		List<PostMediaResponseDTO> media,
+		List<PostKeywordResponseDTO> keywords,
 		OffsetDateTime createdAt,
 		OffsetDateTime updatedAt
 ) {

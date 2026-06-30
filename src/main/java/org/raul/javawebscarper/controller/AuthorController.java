@@ -2,10 +2,11 @@ package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.author.AuthorRequest;
-import org.raul.javawebscarper.api.author.AuthorResponse;
-import org.raul.javawebscarper.api.common.PageRequestFactory;
-import org.raul.javawebscarper.api.common.PageResponse;
+import org.raul.javawebscarper.dto.request.author.CreateAuthorRequestDTO;
+import org.raul.javawebscarper.dto.request.author.UpdateAuthorRequestDTO;
+import org.raul.javawebscarper.dto.response.author.AuthorResponseDTO;
+import org.raul.javawebscarper.util.PageRequestFactory;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
 import org.raul.javawebscarper.service.AuthorService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -31,12 +32,12 @@ public class AuthorController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public AuthorResponse create(@Valid @RequestBody AuthorRequest request) {
+	public AuthorResponseDTO create(@Valid @RequestBody CreateAuthorRequestDTO request) {
 		return authorService.create(request);
 	}
 
 	@GetMapping
-	public PageResponse<AuthorResponse> findAll(
+	public PageResponseDTO<AuthorResponseDTO> findAll(
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
 			@RequestParam(defaultValue = "id") String sortBy,
@@ -47,12 +48,12 @@ public class AuthorController {
 	}
 
 	@GetMapping("/{id}")
-	public AuthorResponse findById(@PathVariable UUID id) {
+	public AuthorResponseDTO findById(@PathVariable UUID id) {
 		return authorService.findById(id);
 	}
 
 	@GetMapping("/by-source/{sourceId}")
-	public PageResponse<AuthorResponse> findBySource(
+	public PageResponseDTO<AuthorResponseDTO> findBySource(
 			@PathVariable Integer sourceId,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -64,9 +65,9 @@ public class AuthorController {
 	}
 
 	@PutMapping("/{id}")
-	public AuthorResponse update(
+	public AuthorResponseDTO update(
 			@PathVariable UUID id,
-			@Valid @RequestBody AuthorRequest request
+			@Valid @RequestBody UpdateAuthorRequestDTO request
 	) {
 		return authorService.update(id, request);
 	}
@@ -77,4 +78,3 @@ public class AuthorController {
 		authorService.delete(id);
 	}
 }
-

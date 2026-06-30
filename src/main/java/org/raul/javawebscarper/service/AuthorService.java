@@ -1,9 +1,10 @@
 package org.raul.javawebscarper.service;
 
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.author.AuthorRequest;
-import org.raul.javawebscarper.api.author.AuthorResponse;
-import org.raul.javawebscarper.api.common.PageResponse;
+import org.raul.javawebscarper.dto.request.author.CreateAuthorRequestDTO;
+import org.raul.javawebscarper.dto.request.author.UpdateAuthorRequestDTO;
+import org.raul.javawebscarper.dto.response.author.AuthorResponseDTO;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
 import org.raul.javawebscarper.exception.BadRequestException;
 import org.raul.javawebscarper.exception.DuplicateResourceException;
 import org.raul.javawebscarper.exception.ResourceNotFoundException;
@@ -28,34 +29,34 @@ public class AuthorService {
 	private final AuthorMapper authorMapper;
 
 	@Transactional
-	public AuthorResponse create(AuthorRequest request) {
+	public AuthorResponseDTO create(CreateAuthorRequestDTO request) {
 		Source source = sourceService.getEntity(request.sourceId());
-		validateUniqueNaturalKeys(source, request, null);
+		validateUniqueNaturalKeys(source, request.externalId(), request.username(), request.profileUrl(), null);
 		Author author = authorMapper.toEntity(request, source);
 		return authorMapper.toResponse(authorRepository.save(author));
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<AuthorResponse> findAll(Pageable pageable) {
-		return PageResponse.from(authorRepository.findAll(pageable), authorMapper::toResponse);
+	public PageResponseDTO<AuthorResponseDTO> findAll(Pageable pageable) {
+		return PageResponseDTO.from(authorRepository.findAll(pageable), authorMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public PageResponse<AuthorResponse> findBySource(Integer sourceId, Pageable pageable) {
+	public PageResponseDTO<AuthorResponseDTO> findBySource(Integer sourceId, Pageable pageable) {
 		Source source = sourceService.getEntity(sourceId);
-		return PageResponse.from(authorRepository.findBySource(source, pageable), authorMapper::toResponse);
+		return PageResponseDTO.from(authorRepository.findBySource(source, pageable), authorMapper::toResponse);
 	}
 
 	@Transactional(readOnly = true)
-	public AuthorResponse findById(UUID id) {
+	public AuthorResponseDTO findById(UUID id) {
 		return authorMapper.toResponse(getEntity(id));
 	}
 
 	@Transactional
-	public AuthorResponse update(UUID id, AuthorRequest request) {
+	public AuthorResponseDTO update(UUID id, UpdateAuthorRequestDTO request) {
 		Author author = getEntity(id);
 		Source source = sourceService.getEntity(request.sourceId());
-		validateUniqueNaturalKeys(source, request, id);
+		validateUniqueNaturalKeys(source, request.externalId(), request.username(), request.profileUrl(), id);
 		authorMapper.updateEntity(author, request, source);
 		return authorMapper.toResponse(author);
 	}
@@ -75,10 +76,16 @@ public class AuthorService {
 				.orElseThrow(() -> new ResourceNotFoundException("Author with id '%s' was not found".formatted(id)));
 	}
 
-	private void validateUniqueNaturalKeys(Source source, AuthorRequest request, UUID currentId) {
-		String externalId = nullIfBlank(request.externalId());
-		String username = request.username().trim();
-		String profileUrl = nullIfBlank(request.profileUrl());
+	private void validateUniqueNaturalKeys(
+			Source source,
+			String externalIdValue,
+			String usernameValue,
+			String profileUrlValue,
+			UUID currentId
+	) {
+		String externalId = nullIfBlank(externalIdValue);
+		String username = usernameValue.trim();
+		String profileUrl = nullIfBlank(profileUrlValue);
 
 		if (externalId != null && existsExternalId(source, externalId, currentId)) {
 			throw new DuplicateResourceException("Author externalId '%s' already exists for source '%s'"

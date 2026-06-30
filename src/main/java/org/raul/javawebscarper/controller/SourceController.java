@@ -2,10 +2,11 @@ package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.common.PageRequestFactory;
-import org.raul.javawebscarper.api.common.PageResponse;
-import org.raul.javawebscarper.api.source.SourceRequest;
-import org.raul.javawebscarper.api.source.SourceResponse;
+import org.raul.javawebscarper.util.PageRequestFactory;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
+import org.raul.javawebscarper.dto.request.source.CreateSourceRequestDTO;
+import org.raul.javawebscarper.dto.request.source.UpdateSourceRequestDTO;
+import org.raul.javawebscarper.dto.response.source.SourceResponseDTO;
 import org.raul.javawebscarper.service.SourceService;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Pageable;
@@ -30,12 +31,12 @@ public class SourceController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public SourceResponse create(@Valid @RequestBody SourceRequest request) {
+	public SourceResponseDTO create(@Valid @RequestBody CreateSourceRequestDTO request) {
 		return sourceService.create(request);
 	}
 
 	@GetMapping
-	public PageResponse<SourceResponse> findAll(
+	public PageResponseDTO<SourceResponseDTO> findAll(
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
 			@RequestParam(defaultValue = "id") String sortBy,
@@ -46,25 +47,25 @@ public class SourceController {
 	}
 
 	@GetMapping("/{id}")
-	public SourceResponse findById(@PathVariable Integer id) {
+	public SourceResponseDTO findById(@PathVariable Integer id) {
 		return sourceService.findById(id);
 	}
 
 	@PutMapping("/{id}")
-	public SourceResponse update(
+	public SourceResponseDTO update(
 			@PathVariable Integer id,
-			@Valid @RequestBody SourceRequest request
+			@Valid @RequestBody UpdateSourceRequestDTO request
 	) {
 		return sourceService.update(id, request);
 	}
 
 	@PatchMapping("/{id}/enable")
-	public SourceResponse enable(@PathVariable Integer id) {
+	public SourceResponseDTO enable(@PathVariable Integer id) {
 		return sourceService.enable(id);
 	}
 
 	@PatchMapping("/{id}/disable")
-	public SourceResponse disable(@PathVariable Integer id) {
+	public SourceResponseDTO disable(@PathVariable Integer id) {
 		return sourceService.disable(id);
 	}
 
@@ -74,4 +75,3 @@ public class SourceController {
 		sourceService.delete(id);
 	}
 }
-

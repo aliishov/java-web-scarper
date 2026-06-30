@@ -1,9 +1,9 @@
-package org.raul.javawebscarper.api.post;
+package org.raul.javawebscarper.dto.request.post;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-public record PostKeywordRequest(
+public record PostKeywordRequestDTO(
 		@NotNull
 		Integer keywordId,
 

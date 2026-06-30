@@ -1,4 +1,4 @@
-package org.raul.javawebscarper.api.common;
+package org.raul.javawebscarper.util;
 
 import org.raul.javawebscarper.exception.BadRequestException;
 import org.springframework.data.domain.PageRequest;

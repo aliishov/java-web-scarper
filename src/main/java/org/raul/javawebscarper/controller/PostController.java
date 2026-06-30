@@ -2,10 +2,11 @@ package org.raul.javawebscarper.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.raul.javawebscarper.api.common.PageRequestFactory;
-import org.raul.javawebscarper.api.common.PageResponse;
-import org.raul.javawebscarper.api.post.PostRequest;
-import org.raul.javawebscarper.api.post.PostResponse;
+import org.raul.javawebscarper.util.PageRequestFactory;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
+import org.raul.javawebscarper.dto.request.post.CreatePostRequestDTO;
+import org.raul.javawebscarper.dto.request.post.UpdatePostRequestDTO;
+import org.raul.javawebscarper.dto.response.post.PostResponseDTO;
 import org.raul.javawebscarper.service.PostService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -33,12 +34,12 @@ public class PostController {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public PostResponse create(@Valid @RequestBody PostRequest request) {
+	public PostResponseDTO create(@Valid @RequestBody CreatePostRequestDTO request) {
 		return postService.create(request);
 	}
 
 	@GetMapping
-	public PageResponse<PostResponse> findAll(
+	public PageResponseDTO<PostResponseDTO> findAll(
 			@RequestParam(required = false) Integer sourceId,
 			@RequestParam(required = false) UUID authorId,
 			@RequestParam(required = false) Integer keywordId,
@@ -57,12 +58,12 @@ public class PostController {
 	}
 
 	@GetMapping("/{id}")
-	public PostResponse findById(@PathVariable UUID id) {
+	public PostResponseDTO findById(@PathVariable UUID id) {
 		return postService.findById(id);
 	}
 
 	@GetMapping("/by-source/{sourceId}")
-	public PageResponse<PostResponse> findBySource(
+	public PageResponseDTO<PostResponseDTO> findBySource(
 			@PathVariable Integer sourceId,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -74,7 +75,7 @@ public class PostController {
 	}
 
 	@GetMapping("/by-author/{authorId}")
-	public PageResponse<PostResponse> findByAuthor(
+	public PageResponseDTO<PostResponseDTO> findByAuthor(
 			@PathVariable UUID authorId,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -86,7 +87,7 @@ public class PostController {
 	}
 
 	@GetMapping("/by-keyword/{keywordId}")
-	public PageResponse<PostResponse> findByKeyword(
+	public PageResponseDTO<PostResponseDTO> findByKeyword(
 			@PathVariable Integer keywordId,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size,
@@ -98,9 +99,9 @@ public class PostController {
 	}
 
 	@PutMapping("/{id}")
-	public PostResponse update(
+	public PostResponseDTO update(
 			@PathVariable UUID id,
-			@Valid @RequestBody PostRequest request
+			@Valid @RequestBody UpdatePostRequestDTO request
 	) {
 		return postService.update(id, request);
 	}
@@ -111,4 +112,3 @@ public class PostController {
 		postService.delete(id);
 	}
 }
-

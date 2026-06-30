@@ -1,4 +1,4 @@
-package org.raul.javawebscarper.api.scrapejob;
+package org.raul.javawebscarper.dto.response.scrapejob;
 
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 
@@ -6,7 +6,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public record ScrapeJobResponse(
+public record ScrapeJobResponseDTO(
 		UUID id,
 		Integer sourceId,
 		String sourceCode,

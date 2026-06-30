@@ -1,27 +1,28 @@
 package org.raul.javawebscarper.mapper;
 
-import org.raul.javawebscarper.api.keyword.KeywordRequest;
-import org.raul.javawebscarper.api.keyword.KeywordResponse;
+import org.raul.javawebscarper.dto.request.keyword.CreateKeywordRequestDTO;
+import org.raul.javawebscarper.dto.request.keyword.UpdateKeywordRequestDTO;
+import org.raul.javawebscarper.dto.response.keyword.KeywordResponseDTO;
 import org.raul.javawebscarper.model.Keyword;
 import org.springframework.stereotype.Component;
 
 @Component
 public class KeywordMapper {
 
-	public Keyword toEntity(KeywordRequest request) {
+	public Keyword toEntity(CreateKeywordRequestDTO request) {
 		return Keyword.builder()
 				.word(normalize(request.word()))
 				.enabled(request.enabled() == null || request.enabled())
 				.build();
 	}
 
-	public void updateEntity(Keyword keyword, KeywordRequest request) {
+	public void updateEntity(Keyword keyword, UpdateKeywordRequestDTO request) {
 		keyword.setWord(normalize(request.word()));
 		keyword.setEnabled(request.enabled() == null || request.enabled());
 	}
 
-	public KeywordResponse toResponse(Keyword keyword) {
-		return new KeywordResponse(
+	public KeywordResponseDTO toResponse(Keyword keyword) {
+		return new KeywordResponseDTO(
 				keyword.getId(),
 				keyword.getWord(),
 				keyword.isEnabled(),
