@@ -25,4 +25,8 @@ public interface ScrapeJobRepository extends JpaRepository<ScrapeJob, UUID>, Jpa
 	Page<ScrapeJob> findBySource(Source source, Pageable pageable);
 
 	Page<ScrapeJob> findByStatus(ScrapeJobStatus status, Pageable pageable);
+
+	boolean existsBySource(Source source);
+
+	boolean existsByKeyword(Keyword keyword);
 }

@@ -18,4 +18,6 @@ public interface PostKeywordRepository extends JpaRepository<PostKeyword, Intege
 	boolean existsByPostAndKeyword(Post post, Keyword keyword);
 
 	List<PostKeyword> findByKeyword(Keyword keyword);
+
+	boolean existsByKeyword(Keyword keyword);
 }
