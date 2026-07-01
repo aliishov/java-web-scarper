@@ -17,6 +17,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class KeywordService {
@@ -43,6 +45,11 @@ public class KeywordService {
 	@Transactional(readOnly = true)
 	public KeywordResponseDTO findById(Integer id) {
 		return KeywordMapper.toResponse(getEntity(id));
+	}
+
+	@Transactional(readOnly = true)
+	public List<Keyword> findEnabledEntities() {
+		return keywordRepository.findByEnabledTrue();
 	}
 
 	@Transactional

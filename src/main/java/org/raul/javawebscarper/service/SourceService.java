@@ -18,6 +18,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class SourceService {
@@ -45,6 +47,11 @@ public class SourceService {
 	@Transactional(readOnly = true)
 	public SourceResponseDTO findById(Integer id) {
 		return SourceMapper.toResponse(getEntity(id));
+	}
+
+	@Transactional(readOnly = true)
+	public List<Source> findEnabledEntities() {
+		return sourceRepository.findByEnabledTrue();
 	}
 
 	@Transactional

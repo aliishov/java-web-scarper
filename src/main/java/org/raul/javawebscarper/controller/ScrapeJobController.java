@@ -8,8 +8,10 @@ import org.raul.javawebscarper.dto.common.PageResponseDTO;
 import org.raul.javawebscarper.dto.request.scrapejob.CompleteScrapeJobRequestDTO;
 import org.raul.javawebscarper.dto.request.scrapejob.FailScrapeJobRequestDTO;
 import org.raul.javawebscarper.dto.request.scrapejob.CreateScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
+import org.raul.javawebscarper.orchestrator.ScrapeJobOrchestrator;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -34,6 +36,7 @@ import java.util.UUID;
 public class ScrapeJobController {
 
 	private final ScrapeJobService scrapeJobService;
+	private final ScrapeJobOrchestrator scrapeJobOrchestrator;
 
 	@PostMapping
 	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> create(
@@ -59,6 +62,12 @@ public class ScrapeJobController {
 		Pageable pageable = PageRequestFactory.create(page, size, sortBy, direction);
 		return ResponseEntity.ok(BaseResponseDTO.success(
 				scrapeJobService.findAll(sourceId, keywordId, status, dateFrom, dateTo, pageable)));
+	}
+
+	@PostMapping("/run-scheduled")
+	public ResponseEntity<BaseResponseDTO<ScheduledScrapeRunResponseDTO>> runScheduled() {
+		ScheduledScrapeRunResponseDTO response = scrapeJobOrchestrator.createAndRunScheduledJobs();
+		return ResponseEntity.ok(BaseResponseDTO.success(response, "Scheduled scrape run completed successfully"));
 	}
 
 	@GetMapping("/{id}")
