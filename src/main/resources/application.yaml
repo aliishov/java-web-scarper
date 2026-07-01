@@ -54,6 +54,18 @@ scraper:
     max-jobs-per-run: ${SCRAPER_SCHEDULER_MAX_JOBS_PER_RUN:100}
     run-on-startup: ${SCRAPER_SCHEDULER_RUN_ON_STARTUP:false}
 
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+    path: /swagger-ui.html
+  packages-to-scan:
+    - org.raul.javawebscarper.controller
+  paths-to-match:
+    - /api/**
+
 logging:
   level:
     org.raul.javawebscarper: ${APP_LOG_LEVEL:INFO}
