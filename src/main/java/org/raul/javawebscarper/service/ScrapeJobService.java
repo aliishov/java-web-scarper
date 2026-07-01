@@ -21,11 +21,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class ScrapeJobService {
+
+	private static final List<ScrapeJobStatus> ACTIVE_JOB_STATUSES = List.of(
+			ScrapeJobStatus.PENDING,
+			ScrapeJobStatus.RUNNING
+	);
+	private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
 
 	private final ScrapeJobRepository scrapeJobRepository;
 	private final SourceService sourceService;
@@ -38,6 +45,21 @@ public class ScrapeJobService {
 		Keyword keyword = keywordService.getEntity(request.keywordId());
 		ScrapeJob scrapeJob = ScrapeJobMapper.toEntity(request, source, keyword);
 		return ScrapeJobMapper.toResponse(scrapeJobRepository.save(scrapeJob));
+	}
+
+	@Transactional
+	public ScrapeJob createPendingJob(Source source, Keyword keyword, LocalDate dateFrom, LocalDate dateTo) {
+		validateDateRange(dateFrom, dateTo);
+		ScrapeJob scrapeJob = ScrapeJob.builder()
+				.source(source)
+				.keyword(keyword)
+				.dateFrom(dateFrom)
+				.dateTo(dateTo)
+				.status(ScrapeJobStatus.PENDING)
+				.postsFound(0)
+				.postsSaved(0)
+				.build();
+		return scrapeJobRepository.save(scrapeJob);
 	}
 
 	@Transactional(readOnly = true)
@@ -70,9 +92,25 @@ public class ScrapeJobService {
 		return PageResponseDTO.from(scrapeJobRepository.findByStatus(status, pageable), ScrapeJobMapper::toResponse);
 	}
 
+	@Transactional(readOnly = true)
+	public boolean hasActiveJob(Source source, Keyword keyword, LocalDate dateFrom, LocalDate dateTo) {
+		return scrapeJobRepository.existsBySourceAndKeywordAndDateFromAndDateToAndStatusIn(
+				source,
+				keyword,
+				dateFrom,
+				dateTo,
+				ACTIVE_JOB_STATUSES
+		);
+	}
+
 	@Transactional
 	public ScrapeJobResponseDTO start(UUID id) {
-		ScrapeJob scrapeJob = getEntity(id);
+		return ScrapeJobMapper.toResponse(markRunning(id));
+	}
+
+	@Transactional
+	public ScrapeJob markRunning(UUID id) {
+		ScrapeJob scrapeJob = getEntityWithSourceAndKeyword(id);
 		if (scrapeJob.getStatus() != ScrapeJobStatus.PENDING) {
 			throw new BadRequestException("Only PENDING scrape jobs can be started");
 		}
@@ -80,36 +118,49 @@ public class ScrapeJobService {
 		scrapeJob.setStartedAt(OffsetDateTime.now());
 		scrapeJob.setFinishedAt(null);
 		scrapeJob.setErrorMessage(null);
-		return ScrapeJobMapper.toResponse(scrapeJob);
+		return scrapeJob;
 	}
 
 	@Transactional
 	public ScrapeJobResponseDTO complete(UUID id, CompleteScrapeJobRequestDTO request) {
+		return ScrapeJobMapper.toResponse(markSuccess(id, request.postsFound(), request.postsSaved()));
+	}
+
+	@Transactional
+	public ScrapeJob markSuccess(UUID id, int postsFound, int postsSaved) {
 		ScrapeJob scrapeJob = getEntity(id);
 		if (scrapeJob.getStatus() != ScrapeJobStatus.RUNNING) {
 			throw new BadRequestException("Only RUNNING scrape jobs can be completed");
 		}
-		if (request.postsSaved() > request.postsFound()) {
+		if (postsFound < 0 || postsSaved < 0) {
+			throw new BadRequestException("postsFound and postsSaved must not be negative");
+		}
+		if (postsSaved > postsFound) {
 			throw new BadRequestException("postsSaved must not be greater than postsFound");
 		}
 		scrapeJob.setStatus(ScrapeJobStatus.SUCCESS);
 		scrapeJob.setFinishedAt(OffsetDateTime.now());
-		scrapeJob.setPostsFound(request.postsFound());
-		scrapeJob.setPostsSaved(request.postsSaved());
+		scrapeJob.setPostsFound(postsFound);
+		scrapeJob.setPostsSaved(postsSaved);
 		scrapeJob.setErrorMessage(null);
-		return ScrapeJobMapper.toResponse(scrapeJob);
+		return scrapeJob;
 	}
 
 	@Transactional
 	public ScrapeJobResponseDTO fail(UUID id, FailScrapeJobRequestDTO request) {
+		return ScrapeJobMapper.toResponse(markFailed(id, request.errorMessage()));
+	}
+
+	@Transactional
+	public ScrapeJob markFailed(UUID id, String errorMessage) {
 		ScrapeJob scrapeJob = getEntity(id);
 		if (scrapeJob.getStatus() != ScrapeJobStatus.PENDING && scrapeJob.getStatus() != ScrapeJobStatus.RUNNING) {
 			throw new BadRequestException("Only PENDING or RUNNING scrape jobs can be failed");
 		}
 		scrapeJob.setStatus(ScrapeJobStatus.FAILED);
 		scrapeJob.setFinishedAt(OffsetDateTime.now());
-		scrapeJob.setErrorMessage(request.errorMessage().trim());
-		return ScrapeJobMapper.toResponse(scrapeJob);
+		scrapeJob.setErrorMessage(normalizeErrorMessage(errorMessage));
+		return scrapeJob;
 	}
 
 	@Transactional
@@ -124,6 +175,12 @@ public class ScrapeJobService {
 	@Transactional(readOnly = true)
 	public ScrapeJob getEntity(UUID id) {
 		return scrapeJobRepository.findById(id)
+				.orElseThrow(() -> new ResourceNotFoundException("ScrapeJob with id '%s' was not found".formatted(id)));
+	}
+
+	@Transactional(readOnly = true)
+	public ScrapeJob getEntityWithSourceAndKeyword(UUID id) {
+		return scrapeJobRepository.findByIdWithSourceAndKeyword(id)
 				.orElseThrow(() -> new ResourceNotFoundException("ScrapeJob with id '%s' was not found".formatted(id)));
 	}
 
@@ -163,5 +220,16 @@ public class ScrapeJobService {
 		if (dateFrom != null && dateTo != null && dateTo.isBefore(dateFrom)) {
 			throw new BadRequestException("dateTo must be greater than or equal to dateFrom");
 		}
+	}
+
+	private String normalizeErrorMessage(String errorMessage) {
+		if (errorMessage == null || errorMessage.isBlank()) {
+			return "Unknown scrape job error";
+		}
+		String trimmed = errorMessage.trim();
+		if (trimmed.length() <= MAX_ERROR_MESSAGE_LENGTH) {
+			return trimmed;
+		}
+		return trimmed.substring(0, MAX_ERROR_MESSAGE_LENGTH);
 	}
 }
