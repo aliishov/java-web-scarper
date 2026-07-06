@@ -2,6 +2,7 @@ package org.raul.javawebscarper;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.raul.javawebscarper.orchestrator.ScrapeJobOrchestrator;
 import org.raul.javawebscarper.service.AuthorService;
 import org.raul.javawebscarper.service.KeywordService;
 import org.raul.javawebscarper.service.PostService;
@@ -9,6 +10,7 @@ import org.raul.javawebscarper.service.ScrapeJobService;
 import org.raul.javawebscarper.service.SourceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -52,6 +54,12 @@ class OpenApiDocumentationTests {
 
 	@MockitoBean
 	private ScrapeJobService scrapeJobService;
+
+	@MockitoBean
+	private ScrapeJobOrchestrator scrapeJobOrchestrator;
+
+	@MockitoBean
+	private JpaMetamodelMappingContext jpaMetamodelMappingContext;
 
 	private MockMvc mockMvc;
 
