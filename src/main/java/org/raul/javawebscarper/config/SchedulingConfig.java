@@ -1,5 +1,6 @@
 package org.raul.javawebscarper.config;
 
+import org.raul.javawebscarper.browser.BrowserEngineProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,7 +10,11 @@ import java.time.Clock;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties({ScrapeSchedulerProperties.class, ScraperEngineProperties.class})
+@EnableConfigurationProperties({
+		ScrapeSchedulerProperties.class,
+		ScraperEngineProperties.class,
+		BrowserEngineProperties.class
+})
 public class SchedulingConfig {
 
 	@Bean
