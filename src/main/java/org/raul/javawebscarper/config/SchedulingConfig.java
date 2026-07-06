@@ -9,7 +9,7 @@ import java.time.Clock;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(ScrapeSchedulerProperties.class)
+@EnableConfigurationProperties({ScrapeSchedulerProperties.class, ScraperEngineProperties.class})
 public class SchedulingConfig {
 
 	@Bean
