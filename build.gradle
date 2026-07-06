@@ -42,3 +42,11 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.register('playwrightInstall', JavaExec) {
+    group = 'playwright'
+    description = 'Installs Playwright Chromium browser binaries for local scraper development.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.microsoft.playwright.CLI'
+    args 'install', 'chromium'
+}
