@@ -59,6 +59,21 @@ scraper:
     fail-on-unsupported-source: ${SCRAPER_ENGINE_FAIL_ON_UNSUPPORTED_SOURCE:true}
     normalize-urls: ${SCRAPER_ENGINE_NORMALIZE_URLS:true}
     remove-tracking-params: ${SCRAPER_ENGINE_REMOVE_TRACKING_PARAMS:true}
+  browser:
+    enabled: ${SCRAPER_BROWSER_ENABLED:true}
+    headless: ${SCRAPER_BROWSER_HEADLESS:true}
+    browser-type: ${SCRAPER_BROWSER_TYPE:CHROMIUM}
+    launch-timeout-ms: ${SCRAPER_BROWSER_LAUNCH_TIMEOUT_MS:30000}
+    navigation-timeout-ms: ${SCRAPER_BROWSER_NAVIGATION_TIMEOUT_MS:30000}
+    action-timeout-ms: ${SCRAPER_BROWSER_ACTION_TIMEOUT_MS:10000}
+    default-wait-ms: ${SCRAPER_BROWSER_DEFAULT_WAIT_MS:1000}
+    viewport-width: ${SCRAPER_BROWSER_VIEWPORT_WIDTH:1366}
+    viewport-height: ${SCRAPER_BROWSER_VIEWPORT_HEIGHT:768}
+    user-agent: "${SCRAPER_BROWSER_USER_AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36}"
+    slow-mo-ms: ${SCRAPER_BROWSER_SLOW_MO_MS:0}
+    max-scroll-attempts: ${SCRAPER_BROWSER_MAX_SCROLL_ATTEMPTS:10}
+    scroll-delay-ms: ${SCRAPER_BROWSER_SCROLL_DELAY_MS:1000}
+    install-browsers-on-startup: ${SCRAPER_BROWSER_INSTALL_BROWSERS_ON_STARTUP:false}
 
 springdoc:
   api-docs:
