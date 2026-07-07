@@ -17,7 +17,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 				+ "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,"
 				+ "org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration,"
 				+ "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration",
-		"spring.jpa.hibernate.ddl-auto=none"
+		"spring.jpa.hibernate.ddl-auto=none",
+		"scraper.browser.enabled=false"
 })
 class JavaWebScarperApplicationTests {
 

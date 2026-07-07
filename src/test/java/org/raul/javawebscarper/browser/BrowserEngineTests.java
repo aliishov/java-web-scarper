@@ -23,10 +23,10 @@ class BrowserEngineTests {
 	@Test
 	void reportsConfiguredBrowserTypeWithoutStartingBrowser() {
 		BrowserEngineProperties properties = new BrowserEngineProperties();
-		properties.setBrowserType(BrowserEngineProperties.BrowserType.WEBKIT);
+		properties.setBrowserType(BrowserType.WEBKIT);
 		BrowserEngine browserEngine = new BrowserEngine(properties);
 
-		assertThat(browserEngine.getBrowserType()).isEqualTo(BrowserEngineProperties.BrowserType.WEBKIT);
+		assertThat(browserEngine.getBrowserType()).isEqualTo(BrowserType.WEBKIT);
 		assertThat(browserEngine.isInitialized()).isFalse();
 	}
 }
