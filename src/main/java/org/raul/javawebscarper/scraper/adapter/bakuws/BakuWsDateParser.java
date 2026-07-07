@@ -1,6 +1,7 @@
 package org.raul.javawebscarper.scraper.adapter.bakuws;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -44,11 +45,12 @@ public class BakuWsDateParser {
 
 	private final ZoneId zoneId;
 
+	@Autowired
 	public BakuWsDateParser(@Value("${scraper.default-time-zone:Asia/Baku}") String zoneId) {
 		this(ZoneId.of(zoneId));
 	}
 
-	public BakuWsDateParser(ZoneId zoneId) {
+	BakuWsDateParser(ZoneId zoneId) {
 		this.zoneId = zoneId;
 	}
 
