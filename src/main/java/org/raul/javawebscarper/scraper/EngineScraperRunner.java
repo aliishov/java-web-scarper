@@ -10,6 +10,8 @@ import org.raul.javawebscarper.scraper.engine.ScraperExecutionException;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionStatus;
 import org.raul.javawebscarper.scraper.support.ScraperClock;
+import org.raul.javawebscarper.service.ScrapedPostIngestionResult;
+import org.raul.javawebscarper.service.ScrapedPostIngestionService;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
@@ -20,11 +22,12 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class StubScraperRunner implements ScraperRunner {
+public class EngineScraperRunner implements ScraperRunner {
 
 	private final ScraperEngine scraperEngine;
 	private final ScraperEngineProperties properties;
 	private final ScraperClock scraperClock;
+	private final ScrapedPostIngestionService ingestionService;
 
 	@Override
 	public ScraperResult run(ScrapeJob job) {
@@ -37,8 +40,9 @@ public class StubScraperRunner implements ScraperRunner {
 				job.getDateTo()
 		);
 
-		ScraperExecutionResult result = scraperEngine.execute(toExecutionContext(job));
-		return toScraperResult(result);
+		ScraperExecutionContext context = toExecutionContext(job);
+		ScraperExecutionResult result = scraperEngine.execute(context);
+		return toScraperResult(context, result);
 	}
 
 	private ScraperExecutionContext toExecutionContext(ScrapeJob job) {
@@ -64,7 +68,7 @@ public class StubScraperRunner implements ScraperRunner {
 		);
 	}
 
-	private ScraperResult toScraperResult(ScraperExecutionResult result) {
+	private ScraperResult toScraperResult(ScraperExecutionContext context, ScraperExecutionResult result) {
 		if (result.status() == ScraperExecutionStatus.FAILED) {
 			throw new ScraperExecutionException(result.errorMessage());
 		}
@@ -74,6 +78,31 @@ public class StubScraperRunner implements ScraperRunner {
 		if (result.status() == ScraperExecutionStatus.EMPTY || result.status() == ScraperExecutionStatus.UNSUPPORTED) {
 			return ScraperResult.empty();
 		}
-		return new ScraperResult(result.posts().size(), 0, List.of());
+		if (result.posts().isEmpty()) {
+			return new ScraperResult(result.postsFound(), 0, List.of());
+		}
+
+		ScrapedPostIngestionResult ingestionResult = ingestionService.ingest(context, result);
+		log.info(
+				"Scraper ingestion result: jobId={}, postsReceived={}, postsCreated={}, postsUpdated={}, "
+						+ "postsSkipped={}, mediaCreated={}, keywordsLinked={}, errors={}",
+				context.job().getId(),
+				ingestionResult.postsReceived(),
+				ingestionResult.postsCreated(),
+				ingestionResult.postsUpdated(),
+				ingestionResult.postsSkipped(),
+				ingestionResult.mediaCreated(),
+				ingestionResult.keywordsLinked(),
+				ingestionResult.errors().size()
+		);
+		if (ingestionResult.allPostsFailed()) {
+			throw new ScraperExecutionException("Scraped post ingestion failed for all posts: "
+					+ String.join("; ", ingestionResult.errors()));
+		}
+		return new ScraperResult(
+				result.postsFound(),
+				ingestionResult.postsSaved(),
+				ingestionResult.savedPostIds()
+		);
 	}
 }
