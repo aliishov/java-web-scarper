@@ -26,7 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -142,15 +145,27 @@ public class PostService {
 	}
 
 	private void replaceKeywords(Post post, List<PostKeywordRequestDTO> keywordRequests) {
-		post.getKeywords().clear();
 		if (keywordRequests == null || keywordRequests.isEmpty()) {
+			removeKeywordsNotIn(post, Set.of());
 			return;
 		}
 
-		Set<Integer> keywordIds = new HashSet<>();
+		Map<Integer, PostKeywordRequestDTO> keywordRequestsById = new LinkedHashMap<>();
 		for (PostKeywordRequestDTO keywordRequest : keywordRequests) {
-			if (!keywordIds.add(keywordRequest.keywordId())) {
+			if (keywordRequestsById.putIfAbsent(keywordRequest.keywordId(), keywordRequest) != null) {
 				throw new BadRequestException("Duplicate keyword id '%s'".formatted(keywordRequest.keywordId()));
+			}
+		}
+
+		removeKeywordsNotIn(post, keywordRequestsById.keySet());
+		Set<Integer> existingKeywordIds = new HashSet<>();
+		for (PostKeyword postKeyword : post.getKeywords()) {
+			existingKeywordIds.add(postKeyword.getKeyword().getId());
+		}
+
+		for (PostKeywordRequestDTO keywordRequest : keywordRequestsById.values()) {
+			if (existingKeywordIds.contains(keywordRequest.keywordId())) {
+				continue;
 			}
 			Keyword keyword = keywordService.getEntity(keywordRequest.keywordId());
 			post.getKeywords().add(PostKeyword.builder()
@@ -158,6 +173,17 @@ public class PostService {
 					.keyword(keyword)
 					.matchedText(nullIfBlank(keywordRequest.matchedText()))
 					.build());
+		}
+	}
+
+	private void removeKeywordsNotIn(Post post, Set<Integer> keywordIdsToKeep) {
+		Iterator<PostKeyword> iterator = post.getKeywords().iterator();
+		while (iterator.hasNext()) {
+			PostKeyword postKeyword = iterator.next();
+			if (!keywordIdsToKeep.contains(postKeyword.getKeyword().getId())) {
+				iterator.remove();
+				postKeyword.setPost(null);
+			}
 		}
 	}
 
