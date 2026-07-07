@@ -20,6 +20,8 @@ public interface AuthorRepository extends JpaRepository<Author, UUID> {
 
 	Optional<Author> findBySourceAndUsername(Source source, String username);
 
+	Optional<Author> findBySourceAndProfileUrl(Source source, String profileUrl);
+
 	Optional<Author> findByProfileUrl(String profileUrl);
 
 	boolean existsBySourceAndExternalId(Source source, String externalId);
