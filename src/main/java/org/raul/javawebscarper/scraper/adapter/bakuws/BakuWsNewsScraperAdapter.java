@@ -19,6 +19,7 @@ import org.raul.javawebscarper.model.enumerated.MediaType;
 import org.raul.javawebscarper.scraper.adapter.NewsScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
+import org.raul.javawebscarper.scraper.engine.ScraperExecutionStatus;
 import org.raul.javawebscarper.scraper.support.DateRangeValidator;
 import org.raul.javawebscarper.scraper.support.UrlNormalizer;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -42,14 +44,61 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	private static final String SEARCH_INPUT_SELECTOR = "form.custom-navbar-search-block input[name='query']";
 	private static final String SEARCH_ICON_SELECTOR = "svg.svg-icon.normal";
 	private static final String RESULT_CARD_SELECTOR = ".post-item";
-	private static final String[] ARTICLE_TEXT_SELECTORS = {
-			".news-inner",
+	private static final int MIN_ARTICLE_TEXT_LENGTH = 50;
+	private static final int MIN_PARAGRAPH_TEXT_LENGTH = 20;
+	private static final String[] ARTICLE_ROOT_SELECTORS = {
+			".post-detail.post-detail-area",
+			".post-detail",
+			"section.news-detail",
+			".news-detail",
+			"main article",
+			"article",
+			".article-content",
+			".single-news-content",
+			".news-content",
 			".post-content",
 			".post-text",
-			".news-content",
-			"article",
-			"main"
+			".entry-content",
+			".news-inner",
+			".post-detail-area",
+			"[class*='article']",
+			"[class*='news']",
+			"[class*='content']"
 	};
+	private static final String CLEANUP_SELECTOR = String.join(", ",
+			"script",
+			"style",
+			"nav",
+			"footer",
+			"aside",
+			"header",
+			"form",
+			"iframe",
+			"noscript",
+			".cat-left-bnr",
+			".side-bnr",
+			"[id*=bnr]",
+			"[class*=bnr]",
+			"[class*=banner]",
+			"[class*=advert]",
+			"[class*=sidebar]",
+			"[class*=comment]",
+			".post-date",
+			".post-detail-title",
+			".post-detail-img",
+			".similar-news",
+			".related-news"
+	);
+	private static final String MEDIA_SELECTOR = String.join(", ",
+			"img[src]",
+			"img[data-src]",
+			"picture img[src]",
+			"picture img[data-src]",
+			"picture source[srcset]",
+			"video[src]",
+			"video source[src]",
+			"source[src]"
+	);
 	private static final ScrapedAuthorDTO AUTHOR = new ScrapedAuthorDTO(
 			"baku.ws",
 			"baku.ws",
@@ -91,9 +140,29 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			BrowserPage page = session.newPage();
 			openSearchPage(page, keyword.trim());
 			List<BakuWsSearchResultCard> cards = collectSearchResultCards(page, context);
-			List<ScrapedPostDTO> posts = collectArticles(page, cards, context);
-			log.info("Finished baku.ws scraping: keyword={}, postsFound={}", keyword, posts.size());
-			return posts.isEmpty() ? ScraperExecutionResult.empty() : ScraperExecutionResult.success(posts);
+			BakuWsArticleCollectionResult result = collectArticles(page, cards, context);
+			log.info(
+					"Finished baku.ws scraping: keyword={}, candidatesFound={}, articlesOpened={}, "
+							+ "postsFound={}, emptyText={}, outOfRange={}, duplicates={}, errors={}",
+					keyword,
+					cards.size(),
+					result.articlesOpened(),
+					result.posts().size(),
+					result.skippedEmptyText(),
+					result.skippedOutOfRange(),
+					result.duplicates(),
+					result.skippedErrors()
+			);
+			if (!result.posts().isEmpty()) {
+				return ScraperExecutionResult.success(result.posts());
+			}
+			if (cards.isEmpty()) {
+				return ScraperExecutionResult.empty();
+			}
+			if (result.hasExtractionFailures()) {
+				return result.toFailedScraperResult(cards.size());
+			}
+			return ScraperExecutionResult.empty();
 		} catch (BrowserEngineException exception) {
 			log.warn("baku.ws scraping failed: {}", exception.getMessage());
 			return ScraperExecutionResult.failed("baku.ws scraping failed: " + exception.getMessage());
@@ -137,13 +206,17 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		for (int scroll = 0; scroll < context.maxPages() && cardsByUrl.size() < context.maxPosts(); scroll++) {
 			CardCollectionStats stats = collectCurrentCards(page, context, cardsByUrl, seenUrls);
 			log.info(
-					"baku.ws search cards pass={}: found={}, added={}, duplicates={}, outOfRange={}, old={}",
+					"baku.ws search cards pass={}: found={}, added={}, duplicateCards={}, "
+							+ "skippedAds={}, skippedMissingUrl={}, skippedDateParse={}, beforeRange={}, afterRange={}",
 					scroll + 1,
 					stats.found(),
 					stats.added(),
 					stats.duplicates(),
-					stats.afterRange(),
-					stats.beforeRange()
+					stats.skippedAds(),
+					stats.skippedMissingUrl(),
+					stats.skippedDateParse(),
+					stats.beforeRange(),
+					stats.afterRange()
 			);
 
 			if (stats.found() == 0 || stats.onlyNewCardsAreOld() || cardsByUrl.size() >= context.maxPosts()) {
@@ -154,6 +227,12 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			}
 			page.scrollToBottom(1, 1_000);
 			page.waitForTimeout(750);
+		}
+		if (!cardsByUrl.isEmpty()) {
+			log.info(
+					"baku.ws candidate URLs: {}",
+					cardsByUrl.keySet().stream().limit(10).toList()
+			);
 		}
 		return cardsByUrl.values().stream().limit(context.maxPosts()).toList();
 	}
@@ -171,16 +250,24 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		int duplicates = 0;
 		int beforeRange = 0;
 		int afterRange = 0;
-		int malformed = 0;
+		int skippedAds = 0;
+		int skippedMissingUrl = 0;
+		int skippedDateParse = 0;
 		int newDatedCards = 0;
 
 		for (Element element : elements) {
-			Optional<BakuWsSearchResultCard> parsedCard = parseResultCard(element);
-			if (parsedCard.isEmpty()) {
-				malformed++;
+			CardParseResult parsedCard = parseResultCard(element);
+			if (parsedCard.card() == null) {
+				switch (parsedCard.skipReason()) {
+					case AD -> skippedAds++;
+					case MISSING_URL -> skippedMissingUrl++;
+					case DATE_PARSE -> skippedDateParse++;
+					default -> {
+					}
+				}
 				continue;
 			}
-			BakuWsSearchResultCard card = parsedCard.get();
+			BakuWsSearchResultCard card = parsedCard.card();
 			if (!seenUrls.add(card.postUrl())) {
 				duplicates++;
 				continue;
@@ -200,12 +287,22 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 				break;
 			}
 		}
-		return new CardCollectionStats(found, added, duplicates, beforeRange, afterRange, malformed, newDatedCards);
+		return new CardCollectionStats(
+				found,
+				added,
+				duplicates,
+				beforeRange,
+				afterRange,
+				skippedAds,
+				skippedMissingUrl,
+				skippedDateParse,
+				newDatedCards
+		);
 	}
 
-	private Optional<BakuWsSearchResultCard> parseResultCard(Element element) {
+	private CardParseResult parseResultCard(Element element) {
 		if (element.parents().stream().anyMatch(parent -> parent.hasClass("cat-left-bnr"))) {
-			return Optional.empty();
+			return CardParseResult.skipped(CardSkipReason.AD);
 		}
 		String postUrl = firstNonBlank(
 				element.selectFirst(".post-item-title a") == null ? null : element.selectFirst(".post-item-title a").attr("href"),
@@ -216,7 +313,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		);
 		if (postUrl == null) {
 			log.warn("Skipping baku.ws card without post URL");
-			return Optional.empty();
+			return CardParseResult.skipped(CardSkipReason.MISSING_URL);
 		}
 		String normalizedUrl = BakuWsScraperSupport.normalizePostUrl(postUrl);
 		String time = text(element, ".post-item-date-time");
@@ -224,7 +321,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		Optional<OffsetDateTime> postDate = dateParser.parseResultCardDate(day, time);
 		if (postDate.isEmpty()) {
 			log.warn("Skipping baku.ws card with unparseable date: url={}, day={}, time={}", normalizedUrl, day, time);
-			return Optional.empty();
+			return CardParseResult.skipped(CardSkipReason.DATE_PARSE);
 		}
 		String thumbnailUrl = Optional.ofNullable(element.selectFirst(".post-item-img img"))
 				.map(image -> firstNonBlank(image.attr("src"), image.attr("data-src")))
@@ -233,7 +330,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 				.filter(BakuWsScraperSupport::isAllowedMediaUrl)
 				.orElse(null);
 
-		return Optional.of(new BakuWsSearchResultCard(
+		return CardParseResult.card(new BakuWsSearchResultCard(
 				normalizedUrl,
 				text(element, ".post-item-title a"),
 				postDate.get(),
@@ -241,34 +338,56 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		));
 	}
 
-	private List<ScrapedPostDTO> collectArticles(
+	private BakuWsArticleCollectionResult collectArticles(
 			BrowserPage page,
 			List<BakuWsSearchResultCard> cards,
 			ScraperExecutionContext context
 	) {
 		List<ScrapedPostDTO> posts = new ArrayList<>();
 		Set<String> seenExternalIds = new LinkedHashSet<>();
+		int articlesOpened = 0;
+		int skippedEmptyText = 0;
+		int skippedOutOfRange = 0;
+		int skippedErrors = 0;
+		int duplicates = 0;
 
 		for (BakuWsSearchResultCard card : cards) {
 			if (posts.size() >= context.maxPosts()) {
 				break;
 			}
+			articlesOpened++;
 			try {
-				collectArticleWithRetry(page, card, context).ifPresent(post -> {
-					if (seenExternalIds.add(post.externalPostId())) {
-						posts.add(post);
-					} else {
-						log.debug("Skipping duplicate baku.ws article by externalPostId={}", post.externalPostId());
+				ArticleCollectionAttempt attempt = collectArticleWithRetry(page, card, context);
+				if (attempt.post() == null) {
+					if (attempt.skipReason() == ArticleSkipReason.EMPTY_TEXT) {
+						skippedEmptyText++;
+					} else if (attempt.skipReason() == ArticleSkipReason.OUT_OF_RANGE) {
+						skippedOutOfRange++;
 					}
-				});
+					continue;
+				}
+				if (seenExternalIds.add(attempt.post().externalPostId())) {
+					posts.add(attempt.post());
+				} else {
+					duplicates++;
+					log.debug("Skipping duplicate baku.ws article by externalPostId={}", attempt.post().externalPostId());
+				}
 			} catch (RuntimeException exception) {
+				skippedErrors++;
 				log.warn("Skipping baku.ws article after parse failure: url={}, error={}", card.postUrl(), exception.getMessage());
 			}
 		}
-		return posts;
+		return new BakuWsArticleCollectionResult(
+				posts,
+				articlesOpened,
+				skippedEmptyText,
+				skippedOutOfRange,
+				skippedErrors,
+				duplicates
+		);
 	}
 
-	private Optional<ScrapedPostDTO> collectArticleWithRetry(
+	private ArticleCollectionAttempt collectArticleWithRetry(
 			BrowserPage page,
 			BakuWsSearchResultCard card,
 			ScraperExecutionContext context
@@ -281,7 +400,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		}
 	}
 
-	private Optional<ScrapedPostDTO> collectArticle(
+	private ArticleCollectionAttempt collectArticle(
 			BrowserPage page,
 			BakuWsSearchResultCard card,
 			ScraperExecutionContext context
@@ -292,13 +411,18 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		OffsetDateTime postDate = parseArticleDate(document).orElse(card.postDate());
 		if (!DateRangeValidator.isInsideRange(postDate, context.dateFrom(), context.dateTo())) {
 			log.debug("Skipping baku.ws article outside date range: url={}, postDate={}", card.postUrl(), postDate);
-			return Optional.empty();
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.OUT_OF_RANGE);
 		}
 
-		String text = extractArticleText(document);
+		String text = extractArticleText(document, card);
 		if (text == null || text.isBlank()) {
-			log.warn("Skipping baku.ws article with empty text: url={}", card.postUrl());
-			return Optional.empty();
+			log.warn(
+					"Skipping baku.ws article with empty text: url={}, title={}, selectorsTried={}",
+					card.postUrl(),
+					card.title(),
+					List.of(ARTICLE_ROOT_SELECTORS)
+			);
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.EMPTY_TEXT);
 		}
 
 		String externalPostId = BakuWsScraperSupport.extractExternalPostId(card.postUrl())
@@ -307,7 +431,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		Map<String, Object> metadata = metadata(context, card);
 
 		log.info("Collected baku.ws article: url={}, mediaCount={}", card.postUrl(), media.size());
-		return Optional.of(new ScrapedPostDTO(
+		return ArticleCollectionAttempt.collected(new ScrapedPostDTO(
 				externalPostId,
 				card.postUrl(),
 				postDate,
@@ -324,37 +448,125 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		String month = text(document, ".post-date-month");
 		String year = text(document, ".post-date-year");
 		String time = text(document, ".post-date-time");
-		if (day == null || month == null || year == null || time == null) {
-			return Optional.empty();
+		if (day != null && month != null && year != null && time != null) {
+			Optional<OffsetDateTime> parsedDate = dateParser.parseArticleDate(day, month, year, time);
+			if (parsedDate.isPresent()) {
+				return parsedDate;
+			}
 		}
-		return dateParser.parseArticleDate(day, month, year, time);
+		return firstMetaContent(
+				document,
+				"meta[property=article:published_time]",
+				"meta[name=publish_date]",
+				"meta[itemprop=datePublished]"
+		).flatMap(this::parseOffsetDateTime);
 	}
 
-	private String extractArticleText(Document document) {
+	String extractArticleText(Document document, BakuWsSearchResultCard card) {
 		String bestText = null;
-		for (String selector : ARTICLE_TEXT_SELECTORS) {
-			Element element = document.selectFirst(selector);
-			if (element == null) {
+		for (Element root : findArticleRoots(document)) {
+			String paragraphText = extractParagraphText(root);
+			if (isUsableArticleText(paragraphText)) {
+				if (isBetterArticleText(paragraphText, bestText)) {
+					bestText = paragraphText;
+				}
 				continue;
 			}
-			Element cleanElement = element.clone();
-			cleanElement.select("script, style, nav, footer, aside, header, .cat-left-bnr, [class*=banner], .post-date")
-					.remove();
-			String text = cleanElement.text().trim();
-			if (text.length() > (bestText == null ? 0 : bestText.length())) {
-				bestText = text;
+			String rootText = extractRootText(root);
+			if (isBetterArticleText(rootText, bestText)) {
+				bestText = rootText;
 			}
 		}
-		return bestText;
+		if (isUsableArticleText(bestText)) {
+			return bestText;
+		}
+		Optional<String> metaDescription = firstMetaContent(
+				document,
+				"meta[name=description]",
+				"meta[property=description]",
+				"meta[property=og:description]"
+		).map(this::normalizeArticleText)
+				.filter(this::isUsableArticleText);
+		if (metaDescription.isPresent()) {
+			log.debug("Using baku.ws meta description fallback for article: url={}", card.postUrl());
+			return metaDescription.get();
+		}
+		return null;
 	}
 
-	private List<ScrapedMediaDTO> extractMedia(Document document, BakuWsSearchResultCard card) {
-		Map<String, MediaType> mediaByUrl = new LinkedHashMap<>();
-		for (String selector : ARTICLE_TEXT_SELECTORS) {
-			Element root = document.selectFirst(selector);
-			if (root == null) {
-				continue;
+	private List<Element> findArticleRoots(Document document) {
+		List<Element> roots = new ArrayList<>();
+		Set<Element> seen = new LinkedHashSet<>();
+		for (String selector : ARTICLE_ROOT_SELECTORS) {
+			for (Element root : document.select(selector)) {
+				if (seen.add(root)) {
+					roots.add(root);
+				}
 			}
+		}
+		return roots;
+	}
+
+	private String extractParagraphText(Element root) {
+		Element cleanRoot = root.clone();
+		cleanRoot.select(CLEANUP_SELECTOR).remove();
+		List<String> paragraphs = cleanRoot
+				.select("p")
+				.stream()
+				.map(Element::text)
+				.map(this::normalizeArticleText)
+				.filter(this::isArticleParagraph)
+				.toList();
+		String text = String.join("\n", paragraphs);
+		return isUsableArticleText(text) ? text : null;
+	}
+
+	private String extractRootText(Element root) {
+		Element cleanElement = root.clone();
+		cleanElement.select(CLEANUP_SELECTOR).remove();
+		String text = normalizeArticleText(cleanElement.text());
+		return isUsableArticleText(text) ? text : null;
+	}
+
+	private boolean isArticleParagraph(String text) {
+		if (text == null || text.length() < MIN_PARAGRAPH_TEXT_LENGTH) {
+			return false;
+		}
+		String normalized = text.toLowerCase(Locale.ROOT)
+				.replace("ə", "e")
+				.replace("ü", "u");
+		return !normalized.equals("dili secin")
+				&& !normalized.equals("son xeberler")
+				&& !normalized.equals("butun xeberler");
+	}
+
+	private boolean isBetterArticleText(String candidate, String current) {
+		return isUsableArticleText(candidate) && (current == null || candidate.length() > current.length());
+	}
+
+	private boolean isUsableArticleText(String text) {
+		return text != null && text.length() >= MIN_ARTICLE_TEXT_LENGTH;
+	}
+
+	private String normalizeArticleText(String text) {
+		if (text == null) {
+			return null;
+		}
+		String normalized = text
+				.replace('\u00A0', ' ')
+				.replaceAll("[\\t\\x0B\\f\\r ]+", " ")
+				.replaceAll(" *\\n+ *", "\n")
+				.trim();
+		List<String> lines = normalized.lines()
+				.map(String::trim)
+				.filter(line -> !line.isBlank())
+				.toList();
+		return String.join("\n", lines);
+	}
+
+	List<ScrapedMediaDTO> extractMedia(Document document, BakuWsSearchResultCard card) {
+		Map<String, MediaType> mediaByUrl = new LinkedHashMap<>();
+		for (Element root : findArticleRoots(document)) {
 			collectMedia(root, card.postUrl(), mediaByUrl);
 		}
 		if (mediaByUrl.isEmpty() && card.thumbnailUrl() != null) {
@@ -370,16 +582,38 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	}
 
 	private void collectMedia(Element root, String baseUrl, Map<String, MediaType> mediaByUrl) {
-		for (Element element : root.select("img[src], img[data-src], video[src], video source[src], source[src]")) {
-			String rawUrl = firstNonBlank(element.attr("src"), element.attr("data-src"));
+		for (Element element : root.select(MEDIA_SELECTOR)) {
+			String rawUrl = firstNonBlank(
+					element.attr("src"),
+					element.attr("data-src"),
+					firstSrcsetUrl(element.attr("srcset")),
+					firstSrcsetUrl(element.attr("data-srcset"))
+			);
 			if (rawUrl == null) {
+				continue;
+			}
+			if (!BakuWsScraperSupport.isAllowedMediaUrl(rawUrl)) {
 				continue;
 			}
 			String normalizedUrl = UrlNormalizer.resolve(baseUrl, rawUrl);
 			if (BakuWsScraperSupport.isAllowedMediaUrl(normalizedUrl)) {
-				mediaByUrl.putIfAbsent(normalizedUrl, BakuWsScraperSupport.mediaTypeForTag(element.tagName()));
+				mediaByUrl.putIfAbsent(
+						normalizedUrl,
+						BakuWsScraperSupport.mediaTypeForTag(element.tagName(), element.parent() == null ? null : element.parent().tagName())
+				);
 			}
 		}
+	}
+
+	private String firstSrcsetUrl(String srcset) {
+		if (srcset == null || srcset.isBlank()) {
+			return null;
+		}
+		String firstCandidate = srcset.split(",")[0].trim();
+		if (firstCandidate.isBlank()) {
+			return null;
+		}
+		return firstCandidate.split("\\s+")[0].trim();
 	}
 
 	private Map<String, Object> metadata(ScraperExecutionContext context, BakuWsSearchResultCard card) {
@@ -409,13 +643,114 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		return null;
 	}
 
+	private Optional<String> firstMetaContent(Document document, String... selectors) {
+		for (String selector : selectors) {
+			Element element = document.selectFirst(selector);
+			if (element == null) {
+				continue;
+			}
+			String content = firstNonBlank(element.attr("content"));
+			if (content != null) {
+				return Optional.of(content);
+			}
+		}
+		return Optional.empty();
+	}
+
+	private Optional<OffsetDateTime> parseOffsetDateTime(String value) {
+		try {
+			return Optional.of(OffsetDateTime.parse(value.trim()));
+		} catch (RuntimeException exception) {
+			log.warn("Unable to parse baku.ws article meta date: value={}", value);
+			return Optional.empty();
+		}
+	}
+
+	private enum CardSkipReason {
+		AD,
+		MISSING_URL,
+		DATE_PARSE
+	}
+
+	private enum ArticleSkipReason {
+		EMPTY_TEXT,
+		OUT_OF_RANGE
+	}
+
+	private record CardParseResult(
+			BakuWsSearchResultCard card,
+			CardSkipReason skipReason
+	) {
+
+		private static CardParseResult card(BakuWsSearchResultCard card) {
+			return new CardParseResult(card, null);
+		}
+
+		private static CardParseResult skipped(CardSkipReason reason) {
+			return new CardParseResult(null, reason);
+		}
+	}
+
+	private record ArticleCollectionAttempt(
+			ScrapedPostDTO post,
+			ArticleSkipReason skipReason
+	) {
+
+		private static ArticleCollectionAttempt collected(ScrapedPostDTO post) {
+			return new ArticleCollectionAttempt(post, null);
+		}
+
+		private static ArticleCollectionAttempt skipped(ArticleSkipReason reason) {
+			return new ArticleCollectionAttempt(null, reason);
+		}
+	}
+
+	private record BakuWsArticleCollectionResult(
+			List<ScrapedPostDTO> posts,
+			int articlesOpened,
+			int skippedEmptyText,
+			int skippedOutOfRange,
+			int skippedErrors,
+			int duplicates
+	) {
+
+		private boolean hasExtractionFailures() {
+			return skippedEmptyText > 0 || skippedErrors > 0;
+		}
+
+		private ScraperExecutionResult toFailedScraperResult(int candidatesFound) {
+			String message = ("baku.ws extraction failed: candidatesFound=%d, articlesOpened=%d, "
+					+ "articlesSkippedEmptyText=%d, articlesSkippedOutOfRange=%d, "
+					+ "articlesSkippedErrors=%d, duplicateArticles=%d, postsCollected=0")
+					.formatted(
+							candidatesFound,
+							articlesOpened,
+							skippedEmptyText,
+							skippedOutOfRange,
+							skippedErrors,
+							duplicates
+					);
+			return new ScraperExecutionResult(
+					ScraperExecutionStatus.FAILED,
+					List.of(),
+					0,
+					articlesOpened,
+					message,
+					null,
+					null
+			);
+		}
+	}
+
 	private record CardCollectionStats(
 			int found,
 			int added,
 			int duplicates,
 			int beforeRange,
 			int afterRange,
-			int malformed,
+			int skippedAds,
+			int skippedMissingUrl,
+			int skippedDateParse,
 			int newDatedCards
 	) {
 

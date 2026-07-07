@@ -52,18 +52,30 @@ public final class BakuWsScraperSupport {
 			return false;
 		}
 		String normalized = mediaUrl.toLowerCase(Locale.ROOT);
-		return !normalized.contains("/images/banners/")
+		return !normalized.startsWith("data:image")
+				&& !normalized.contains("/images/banners/")
+				&& !normalized.contains("/assets/banners/")
 				&& !normalized.contains("placeholder")
+				&& !normalized.contains("placeholder_home")
+				&& !normalized.contains("icons-v6.svg")
+				&& !normalized.contains("sprite")
+				&& !normalized.contains("logo")
 				&& !normalized.contains("banner");
 	}
 
 	public static MediaType mediaTypeForTag(String tagName) {
+		return mediaTypeForTag(tagName, null);
+	}
+
+	public static MediaType mediaTypeForTag(String tagName, String parentTagName) {
 		if (tagName == null) {
 			return MediaType.UNKNOWN;
 		}
+		String parent = parentTagName == null ? "" : parentTagName.toLowerCase(Locale.ROOT);
 		return switch (tagName.toLowerCase(Locale.ROOT)) {
 			case "img" -> MediaType.IMAGE;
-			case "video", "source" -> MediaType.VIDEO;
+			case "video" -> MediaType.VIDEO;
+			case "source" -> "picture".equals(parent) ? MediaType.IMAGE : MediaType.VIDEO;
 			default -> MediaType.UNKNOWN;
 		};
 	}
