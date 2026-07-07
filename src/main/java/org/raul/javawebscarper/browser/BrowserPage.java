@@ -56,6 +56,14 @@ public class BrowserPage implements AutoCloseable {
 		});
 	}
 
+	public void press(String selector, String key) {
+		execute("press", () -> {
+			log.debug("Pressing key on selector {}", selector);
+			page.press(selector, key, new Page.PressOptions().setTimeout(properties.getActionTimeoutMs()));
+			return null;
+		});
+	}
+
 	public String textContent(String selector) {
 		return execute("textContent", () -> page.textContent(
 				selector,
