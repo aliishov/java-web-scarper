@@ -6,6 +6,7 @@ import org.raul.javawebscarper.service.AuthorService;
 import org.raul.javawebscarper.service.KeywordService;
 import org.raul.javawebscarper.service.PostService;
 import org.raul.javawebscarper.service.ScrapeJobService;
+import org.raul.javawebscarper.service.ScrapedPostIngestionService;
 import org.raul.javawebscarper.service.SourceService;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
@@ -36,6 +37,9 @@ class JavaWebScarperApplicationTests {
 
 	@MockitoBean
 	private ScrapeJobService scrapeJobService;
+
+	@MockitoBean
+	private ScrapedPostIngestionService scrapedPostIngestionService;
 
 	@MockitoBean
 	private ScrapeJobOrchestrator scrapeJobOrchestrator;

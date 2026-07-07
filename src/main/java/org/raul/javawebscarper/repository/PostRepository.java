@@ -23,6 +23,10 @@ public interface PostRepository extends JpaRepository<Post, UUID>, JpaSpecificat
 
 	Optional<Post> findBySourceAndExternalPostId(Source source, String externalPostId);
 
+	Optional<Post> findBySourceAndPostUrl(Source source, String postUrl);
+
+	Optional<Post> findBySourceAndTextHash(Source source, String textHash);
+
 	boolean existsByPostUrl(String postUrl);
 
 	boolean existsBySourceAndExternalPostId(Source source, String externalPostId);

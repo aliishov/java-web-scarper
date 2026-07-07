@@ -11,6 +11,10 @@ import org.raul.javawebscarper.scraper.engine.ScraperEngine;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionException;
 import org.raul.javawebscarper.scraper.registry.ScraperAdapterRegistry;
 import org.raul.javawebscarper.scraper.support.ScraperClock;
+import org.raul.javawebscarper.service.ScrapedPostIngestionService;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -22,10 +26,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class StubScraperRunnerTests {
+@ExtendWith(MockitoExtension.class)
+class EngineScraperRunnerTests {
+
+	@Mock
+	private ScrapedPostIngestionService ingestionService;
 
 	private ScraperEngineProperties properties;
-	private StubScraperRunner runner;
+	private EngineScraperRunner runner;
 	private ScrapeJob job;
 
 	@BeforeEach
@@ -38,7 +46,7 @@ class StubScraperRunnerTests {
 		UnsupportedSourceScraperAdapter unsupportedAdapter = new UnsupportedSourceScraperAdapter();
 		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(unsupportedAdapter), unsupportedAdapter);
 		ScraperEngine scraperEngine = new ScraperEngine(registry, scraperClock);
-		runner = new StubScraperRunner(scraperEngine, properties, scraperClock);
+		runner = new EngineScraperRunner(scraperEngine, properties, scraperClock, ingestionService);
 
 		Source source = Source.builder().id(1).code("baku-ws").build();
 		Keyword keyword = Keyword.builder().id(1).word("economy").build();
