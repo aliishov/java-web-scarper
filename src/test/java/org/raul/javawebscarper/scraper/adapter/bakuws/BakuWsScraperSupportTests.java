@@ -36,13 +36,19 @@ class BakuWsScraperSupportTests {
 	void filtersBannerAndPlaceholderMediaUrls() {
 		assertThat(BakuWsScraperSupport.isAllowedMediaUrl("https://baku.ws/storage/photos/a.webp")).isTrue();
 		assertThat(BakuWsScraperSupport.isAllowedMediaUrl("https://baku.ws/images/banners/a.jpg")).isFalse();
+		assertThat(BakuWsScraperSupport.isAllowedMediaUrl("https://baku.ws/assets/banners/a.jpg")).isFalse();
 		assertThat(BakuWsScraperSupport.isAllowedMediaUrl("https://baku.ws/storage/placeholder_home.jpg")).isFalse();
+		assertThat(BakuWsScraperSupport.isAllowedMediaUrl("data:image/png;base64,AAAA")).isFalse();
+		assertThat(BakuWsScraperSupport.isAllowedMediaUrl("https://baku.ws/assets/icons-v6.svg")).isFalse();
+		assertThat(BakuWsScraperSupport.isAllowedMediaUrl("https://baku.ws/storage/logo.png")).isFalse();
 	}
 
 	@Test
 	void mapsMediaTypeByTagName() {
 		assertThat(BakuWsScraperSupport.mediaTypeForTag("img")).isEqualTo(MediaType.IMAGE);
 		assertThat(BakuWsScraperSupport.mediaTypeForTag("video")).isEqualTo(MediaType.VIDEO);
+		assertThat(BakuWsScraperSupport.mediaTypeForTag("source", "picture")).isEqualTo(MediaType.IMAGE);
+		assertThat(BakuWsScraperSupport.mediaTypeForTag("source", "video")).isEqualTo(MediaType.VIDEO);
 		assertThat(BakuWsScraperSupport.mediaTypeForTag("a")).isEqualTo(MediaType.UNKNOWN);
 	}
 }
