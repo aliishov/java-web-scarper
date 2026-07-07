@@ -41,10 +41,4 @@ public class BrowserEngineProperties {
 	@PositiveOrZero
 	private long scrollDelayMs = 1_000;
 	private boolean installBrowsersOnStartup = false;
-
-	public enum BrowserType {
-		CHROMIUM,
-		FIREFOX,
-		WEBKIT
-	}
 }

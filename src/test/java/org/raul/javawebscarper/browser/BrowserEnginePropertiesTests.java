@@ -33,7 +33,7 @@ class BrowserEnginePropertiesTests {
 
 		assertThat(properties.isEnabled()).isFalse();
 		assertThat(properties.isHeadless()).isFalse();
-		assertThat(properties.getBrowserType()).isEqualTo(BrowserEngineProperties.BrowserType.FIREFOX);
+		assertThat(properties.getBrowserType()).isEqualTo(BrowserType.FIREFOX);
 		assertThat(properties.getLaunchTimeoutMs()).isEqualTo(45_000);
 		assertThat(properties.getNavigationTimeoutMs()).isEqualTo(35_000);
 		assertThat(properties.getActionTimeoutMs()).isEqualTo(12_000);
@@ -53,7 +53,7 @@ class BrowserEnginePropertiesTests {
 
 		assertThat(properties.isEnabled()).isTrue();
 		assertThat(properties.isHeadless()).isTrue();
-		assertThat(properties.getBrowserType()).isEqualTo(BrowserEngineProperties.BrowserType.CHROMIUM);
+		assertThat(properties.getBrowserType()).isEqualTo(BrowserType.CHROMIUM);
 		assertThat(properties.getLaunchTimeoutMs()).isEqualTo(30_000);
 		assertThat(properties.getNavigationTimeoutMs()).isEqualTo(30_000);
 		assertThat(properties.getActionTimeoutMs()).isEqualTo(10_000);

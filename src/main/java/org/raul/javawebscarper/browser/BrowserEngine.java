@@ -61,7 +61,7 @@ public class BrowserEngine {
 		}
 	}
 
-	public BrowserEngineProperties.BrowserType getBrowserType() {
+	public BrowserType getBrowserType() {
 		return properties.getBrowserType();
 	}
 
