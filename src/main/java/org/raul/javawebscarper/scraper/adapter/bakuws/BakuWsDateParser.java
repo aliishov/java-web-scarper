@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Map;
@@ -44,19 +45,29 @@ public class BakuWsDateParser {
 	);
 
 	private final ZoneId zoneId;
+	private final Clock clock;
 
 	@Autowired
 	public BakuWsDateParser(@Value("${scraper.default-time-zone:Asia/Baku}") String zoneId) {
-		this(ZoneId.of(zoneId));
+		this(ZoneId.of(zoneId), Clock.system(ZoneId.of(zoneId)));
 	}
 
 	BakuWsDateParser(ZoneId zoneId) {
+		this(zoneId, Clock.system(zoneId));
+	}
+
+	BakuWsDateParser(ZoneId zoneId, Clock clock) {
 		this.zoneId = zoneId;
+		this.clock = clock;
 	}
 
 	public Optional<OffsetDateTime> parseResultCardDate(String dayText, String timeText) {
 		if (dayText == null || timeText == null) {
 			return Optional.empty();
+		}
+		Optional<OffsetDateTime> relativeDate = parseRelativeDate(dayText, timeText);
+		if (relativeDate.isPresent()) {
+			return relativeDate;
 		}
 		String[] parts = dayText.trim().split("\\s+");
 		if (parts.length != 3) {
@@ -73,6 +84,26 @@ public class BakuWsDateParser {
 			String timeText
 	) {
 		return parseDateTime(dayText, monthText, yearText, timeText);
+	}
+
+	private Optional<OffsetDateTime> parseRelativeDate(String dayText, String timeText) {
+		String normalizedDay = normalizeDayText(dayText);
+		LocalDate date;
+		if ("bugun".equals(normalizedDay) || "bu gun".equals(normalizedDay)) {
+			date = LocalDate.now(clock.withZone(zoneId));
+		} else if ("dunen".equals(normalizedDay)) {
+			date = LocalDate.now(clock.withZone(zoneId)).minusDays(1);
+		} else {
+			return Optional.empty();
+		}
+		try {
+			return Optional.of(date.atTime(LocalTime.parse(timeText.trim()))
+					.atZone(zoneId)
+					.toOffsetDateTime());
+		} catch (RuntimeException exception) {
+			log.warn("Unable to parse baku.ws relative date time: dayText={}, timeText={}", dayText, timeText);
+			return Optional.empty();
+		}
 	}
 
 	private Optional<OffsetDateTime> parseDateTime(
@@ -104,5 +135,18 @@ public class BakuWsDateParser {
 			);
 			return Optional.empty();
 		}
+	}
+
+	private String normalizeDayText(String value) {
+		return value.trim()
+				.toLowerCase(Locale.ROOT)
+				.replace("Ã¼", "u")
+				.replace("ü", "u")
+				.replace("Ãœ", "u")
+				.replace("Ü", "u")
+				.replace("É™", "e")
+				.replace("ə", "e")
+				.replace("Ə", "e")
+				.replaceAll("\\s+", " ");
 	}
 }
