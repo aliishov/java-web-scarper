@@ -12,6 +12,7 @@ import java.time.Clock;
 @EnableScheduling
 @EnableConfigurationProperties({
 		ScrapeSchedulerProperties.class,
+		DailyScrapingProperties.class,
 		ScraperEngineProperties.class,
 		BrowserEngineProperties.class
 })
