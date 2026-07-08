@@ -89,6 +89,40 @@ class BakuWsNewsScraperAdapterTests {
 	}
 
 	@Test
+	void parsesArticleDateTimeFromPostDetailImageBlock() {
+		Document document = Jsoup.parse("""
+				<html>
+				  <body>
+				    <div class="post-date">
+				      <span class="post-date-day">01</span>
+				      <span class="post-date-month">iyn</span>
+				      <span class="post-date-year">2026</span>
+				      <span class="post-date-time">10:15</span>
+				    </div>
+				    <div class="post-detail post-detail-area">
+				      <div class="post-detail-top">
+				        <div class="post-detail-img">
+				          <img src="/storage/photos/2026/07/article.webp">
+				          <div class="post-date">
+				            <span class="post-date-inner">
+				              <span class="post-date-day">07</span>
+				              <span class="post-date-month">iyl</span>
+				            </span>
+				            <span class="post-date-year">2026</span>
+				            <span class="post-date-time">23:36</span>
+				          </div>
+				        </div>
+				      </div>
+				    </div>
+				  </body>
+				</html>
+				""", "https://baku.ws/incident/example");
+
+		assertThat(adapter.parseArticleDate(document))
+				.contains(OffsetDateTime.parse("2026-07-07T23:36:00+04:00"));
+	}
+
+	@Test
 	void extractsArticleMediaOnlyFromPostDetailMainImage() {
 		Document document = Jsoup.parse("""
 				<html>

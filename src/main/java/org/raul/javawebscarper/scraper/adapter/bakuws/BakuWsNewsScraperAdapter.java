@@ -52,6 +52,10 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			".post-detail-top .post-detail-img > img[srcset]",
 			".post-detail-top .post-detail-img > img[data-srcset]"
 	);
+	private static final String ARTICLE_DATE_DAY_SELECTOR = ".post-detail-top .post-detail-img .post-date-day";
+	private static final String ARTICLE_DATE_MONTH_SELECTOR = ".post-detail-top .post-detail-img .post-date-month";
+	private static final String ARTICLE_DATE_YEAR_SELECTOR = ".post-detail-top .post-detail-img .post-date-year";
+	private static final String ARTICLE_DATE_TIME_SELECTOR = ".post-detail-top .post-detail-img .post-date-time";
 	private static final String[] ARTICLE_ROOT_SELECTORS = {
 			".post-detail.post-detail-area",
 			".post-detail",
@@ -439,23 +443,18 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		));
 	}
 
-	private Optional<OffsetDateTime> parseArticleDate(Document document) {
-		String day = text(document, ".post-date-day");
-		String month = text(document, ".post-date-month");
-		String year = text(document, ".post-date-year");
-		String time = text(document, ".post-date-time");
+	Optional<OffsetDateTime> parseArticleDate(Document document) {
+		String day = text(document, ARTICLE_DATE_DAY_SELECTOR);
+		String month = text(document, ARTICLE_DATE_MONTH_SELECTOR);
+		String year = text(document, ARTICLE_DATE_YEAR_SELECTOR);
+		String time = text(document, ARTICLE_DATE_TIME_SELECTOR);
 		if (day != null && month != null && year != null && time != null) {
 			Optional<OffsetDateTime> parsedDate = dateParser.parseArticleDate(day, month, year, time);
 			if (parsedDate.isPresent()) {
 				return parsedDate;
 			}
 		}
-		return firstMetaContent(
-				document,
-				"meta[property=article:published_time]",
-				"meta[name=publish_date]",
-				"meta[itemprop=datePublished]"
-		).flatMap(this::parseOffsetDateTime);
+		return Optional.empty();
 	}
 
 	String extractArticleText(Document document, BakuWsSearchResultCard card) {
