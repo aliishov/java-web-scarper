@@ -89,24 +89,27 @@ class BakuWsNewsScraperAdapterTests {
 	}
 
 	@Test
-	void extractsArticleMediaAndFiltersNoise() {
+	void extractsArticleMediaOnlyFromPostDetailMainImage() {
 		Document document = Jsoup.parse("""
 				<html>
 				  <body>
-				    <section class="news-detail">
-				      <div class="post-detail post-detail-area">
-				        <img src="/storage/photos/2026/07/article.webp">
-				        <picture>
-				          <source srcset="/storage/photos/2026/07/picture.webp 1x, /storage/photos/2026/07/picture-large.webp 2x">
-				        </picture>
-				        <video>
-				          <source src="/storage/videos/2026/07/video.mp4">
-				        </video>
-				        <img src="/images/banners/ad.jpg">
-				        <img src="data:image/png;base64,AAAA">
-				        <img src="/storage/logo.png">
+				    <div class="post-detail post-detail-area">
+				      <div class="post-detail-top">
+				        <div class="post-detail-img">
+				          <img src="/storage/photos/2026/07/article.webp">
+				        </div>
 				      </div>
-				    </section>
+				      <div class="post-detail-content resize-area">
+				        <img src="https://avatars.mds.yandex.net/ad-image.jpg">
+				        <img src="/storage/photos/2026/07/content-image-should-not-be-used.webp">
+				      </div>
+				    </div>
+				    <aside class="sidebar">
+				      <img src="/storage/photos/2026/07/sidebar.webp">
+				    </aside>
+				    <div class="related-news">
+				      <img src="/storage/photos/2026/07/related.webp">
+				    </div>
 				  </body>
 				</html>
 				""", "https://baku.ws/incident/example");
@@ -116,13 +119,11 @@ class BakuWsNewsScraperAdapterTests {
 		assertThat(media)
 				.extracting(ScrapedMediaDTO::mediaUrl)
 				.containsExactly(
-						"https://baku.ws/storage/photos/2026/07/article.webp",
-						"https://baku.ws/storage/photos/2026/07/picture.webp",
-						"https://baku.ws/storage/videos/2026/07/video.mp4"
+						"https://baku.ws/storage/photos/2026/07/article.webp"
 				);
 		assertThat(media)
 				.extracting(ScrapedMediaDTO::mediaType)
-				.containsExactly(MediaType.IMAGE, MediaType.IMAGE, MediaType.VIDEO);
+				.containsExactly(MediaType.IMAGE);
 	}
 
 	@Test
@@ -130,11 +131,11 @@ class BakuWsNewsScraperAdapterTests {
 		Document document = Jsoup.parse("""
 				<html>
 				  <body>
-				    <section class="news-detail">
-				      <div class="post-detail post-detail-area">
-				        <img src="/images/banners/ad.jpg">
+				    <div class="post-detail post-detail-area">
+				      <div class="post-detail-content resize-area">
+				        <img src="/storage/photos/2026/07/content-image-should-not-be-used.webp">
 				      </div>
-				    </section>
+				    </div>
 				  </body>
 				</html>
 				""", "https://baku.ws/incident/example");

@@ -46,6 +46,12 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	private static final String RESULT_CARD_SELECTOR = ".post-item";
 	private static final int MIN_ARTICLE_TEXT_LENGTH = 50;
 	private static final int MIN_PARAGRAPH_TEXT_LENGTH = 20;
+	private static final String ARTICLE_MAIN_IMAGE_SELECTOR = String.join(", ",
+			".post-detail-top .post-detail-img > img[src]",
+			".post-detail-top .post-detail-img > img[data-src]",
+			".post-detail-top .post-detail-img > img[srcset]",
+			".post-detail-top .post-detail-img > img[data-srcset]"
+	);
 	private static final String[] ARTICLE_ROOT_SELECTORS = {
 			".post-detail.post-detail-area",
 			".post-detail",
@@ -88,16 +94,6 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			".post-detail-img",
 			".similar-news",
 			".related-news"
-	);
-	private static final String MEDIA_SELECTOR = String.join(", ",
-			"img[src]",
-			"img[data-src]",
-			"picture img[src]",
-			"picture img[data-src]",
-			"picture source[srcset]",
-			"video[src]",
-			"video source[src]",
-			"source[src]"
 	);
 	private static final ScrapedAuthorDTO AUTHOR = new ScrapedAuthorDTO(
 			"baku.ws",
@@ -566,9 +562,8 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 
 	List<ScrapedMediaDTO> extractMedia(Document document, BakuWsSearchResultCard card) {
 		Map<String, MediaType> mediaByUrl = new LinkedHashMap<>();
-		for (Element root : findArticleRoots(document)) {
-			collectMedia(root, card.postUrl(), mediaByUrl);
-		}
+		extractMainImageUrl(document, card.postUrl())
+				.ifPresent(mediaUrl -> mediaByUrl.put(mediaUrl, MediaType.IMAGE));
 		if (mediaByUrl.isEmpty() && card.thumbnailUrl() != null) {
 			mediaByUrl.put(card.thumbnailUrl(), MediaType.IMAGE);
 		}
@@ -581,28 +576,24 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		return media;
 	}
 
-	private void collectMedia(Element root, String baseUrl, Map<String, MediaType> mediaByUrl) {
-		for (Element element : root.select(MEDIA_SELECTOR)) {
-			String rawUrl = firstNonBlank(
-					element.attr("src"),
-					element.attr("data-src"),
-					firstSrcsetUrl(element.attr("srcset")),
-					firstSrcsetUrl(element.attr("data-srcset"))
-			);
-			if (rawUrl == null) {
-				continue;
-			}
-			if (!BakuWsScraperSupport.isAllowedMediaUrl(rawUrl)) {
-				continue;
-			}
-			String normalizedUrl = UrlNormalizer.resolve(baseUrl, rawUrl);
-			if (BakuWsScraperSupport.isAllowedMediaUrl(normalizedUrl)) {
-				mediaByUrl.putIfAbsent(
-						normalizedUrl,
-						BakuWsScraperSupport.mediaTypeForTag(element.tagName(), element.parent() == null ? null : element.parent().tagName())
-				);
-			}
+	private Optional<String> extractMainImageUrl(Document document, String baseUrl) {
+		Element image = document.selectFirst(ARTICLE_MAIN_IMAGE_SELECTOR);
+		if (image == null) {
+			return Optional.empty();
 		}
+		String rawUrl = firstNonBlank(
+				image.attr("src"),
+				image.attr("data-src"),
+				firstSrcsetUrl(image.attr("srcset")),
+				firstSrcsetUrl(image.attr("data-srcset"))
+		);
+		if (rawUrl == null || !BakuWsScraperSupport.isAllowedMediaUrl(rawUrl)) {
+			return Optional.empty();
+		}
+		String normalizedUrl = UrlNormalizer.resolve(baseUrl, rawUrl);
+		return BakuWsScraperSupport.isAllowedMediaUrl(normalizedUrl)
+				? Optional.of(normalizedUrl)
+				: Optional.empty();
 	}
 
 	private String firstSrcsetUrl(String srcset) {
