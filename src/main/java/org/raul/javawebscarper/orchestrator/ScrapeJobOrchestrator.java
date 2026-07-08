@@ -2,11 +2,15 @@ package org.raul.javawebscarper.orchestrator;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.raul.javawebscarper.config.DailyScrapingProperties;
 import org.raul.javawebscarper.config.ScrapeSchedulerProperties;
+import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.scheduler.PreviousDayDateRangeResolver;
+import org.raul.javawebscarper.scheduler.ScrapeDateRange;
 import org.raul.javawebscarper.scraper.ScraperResult;
 import org.raul.javawebscarper.scraper.ScraperRunner;
 import org.raul.javawebscarper.service.KeywordService;
@@ -17,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
@@ -28,14 +33,16 @@ public class ScrapeJobOrchestrator {
 	private final KeywordService keywordService;
 	private final ScrapeJobService scrapeJobService;
 	private final ScraperRunner scraperRunner;
-	private final ScrapeSchedulerProperties properties;
+	private final ScrapeSchedulerProperties schedulerProperties;
 	private final Clock schedulerClock;
+	private final DailyScrapingProperties dailyProperties;
+	private final PreviousDayDateRangeResolver previousDayDateRangeResolver;
 
 	public ScheduledScrapeRunResponseDTO createAndRunScheduledJobs() {
 		OffsetDateTime startedAt = OffsetDateTime.now(schedulerClock);
 		LocalDate dateTo = startedAt.toLocalDate();
 		LocalDate dateFrom = startedAt
-				.minus(properties.getLookbackAmount(), properties.getLookbackUnit())
+				.minus(schedulerProperties.getLookbackAmount(), schedulerProperties.getLookbackUnit())
 				.toLocalDate();
 
 		List<Source> sources = sourceService.findEnabledEntities();
@@ -47,18 +54,27 @@ public class ScrapeJobOrchestrator {
 				keywords.size(),
 				dateFrom,
 				dateTo,
-				properties.getMaxJobsPerRun()
+				schedulerProperties.getMaxJobsPerRun()
 		);
 
-		RunCounters counters = createAndRunJobs(sources, keywords, dateFrom, dateTo);
+		RunCounters counters = createAndRunJobs(
+				sources,
+				keywords,
+				dateFrom,
+				dateTo,
+				schedulerProperties.getMaxJobsPerRun()
+		);
 		OffsetDateTime finishedAt = OffsetDateTime.now(schedulerClock);
 
 		log.info(
-				"Scheduled scrape run finished: jobsCreated={}, jobsSucceeded={}, jobsFailed={}, jobsSkipped={}",
+				"Scheduled scrape run finished: jobsCreated={}, jobsSucceeded={}, jobsFailed={}, jobsSkipped={}, "
+						+ "postsFound={}, postsSaved={}",
 				counters.jobsCreated,
 				counters.jobsSucceeded,
 				counters.jobsFailed,
-				counters.jobsSkipped
+				counters.jobsSkipped,
+				counters.postsFound,
+				counters.postsSaved
 		);
 
 		return new ScheduledScrapeRunResponseDTO(
@@ -73,20 +89,83 @@ public class ScrapeJobOrchestrator {
 		);
 	}
 
-	private RunCounters createAndRunJobs(List<Source> sources, List<Keyword> keywords, LocalDate dateFrom, LocalDate dateTo) {
+	public DailyScrapeRunResponseDTO createAndRunDailyPreviousDayJobs() {
+		ZoneId zoneId = dailyProperties.getResolvedZoneId();
+		OffsetDateTime startedAt = nowInZone(zoneId);
+		LocalDate today = schedulerClock.instant().atZone(zoneId).toLocalDate();
+		ScrapeDateRange dateRange = previousDayDateRangeResolver.resolve(today, zoneId);
+
+		List<Source> sources = sourceService.findEnabledEntities();
+		List<Keyword> keywords = keywordService.findEnabledEntities();
+
+		log.info(
+				"Starting daily previous-day scrape run: sources={}, keywords={}, dateFrom={}, dateTo={}, "
+						+ "zoneId={}, maxJobsPerRun={}",
+				sources.size(),
+				keywords.size(),
+				dateRange.dateFrom(),
+				dateRange.dateTo(),
+				zoneId,
+				dailyProperties.getMaxJobsPerRun()
+		);
+
+		RunCounters counters = createAndRunJobs(
+				sources,
+				keywords,
+				dateRange.fromLocalDate(),
+				dateRange.toLocalDate(),
+				dailyProperties.getMaxJobsPerRun()
+		);
+		OffsetDateTime finishedAt = nowInZone(zoneId);
+
+		log.info(
+				"Daily previous-day scrape run finished: jobsCreated={}, jobsSucceeded={}, jobsFailed={}, "
+						+ "jobsSkipped={}, postsFound={}, postsSaved={}",
+				counters.jobsCreated,
+				counters.jobsSucceeded,
+				counters.jobsFailed,
+				counters.jobsSkipped,
+				counters.postsFound,
+				counters.postsSaved
+		);
+
+		return new DailyScrapeRunResponseDTO(
+				dateRange.dateFrom(),
+				dateRange.dateTo(),
+				zoneId.toString(),
+				sources.size(),
+				keywords.size(),
+				counters.jobsCreated,
+				counters.jobsSucceeded,
+				counters.jobsFailed,
+				counters.jobsSkipped,
+				counters.postsFound,
+				counters.postsSaved,
+				startedAt,
+				finishedAt
+		);
+	}
+
+	private RunCounters createAndRunJobs(
+			List<Source> sources,
+			List<Keyword> keywords,
+			LocalDate dateFrom,
+			LocalDate dateTo,
+			int maxJobsPerRun
+	) {
 		RunCounters counters = new RunCounters();
 		boolean maxJobsReached = false;
 
 		for (Source source : sources) {
 			for (Keyword keyword : keywords) {
-				if (counters.jobsCreated >= properties.getMaxJobsPerRun()) {
+				if (counters.jobsCreated >= maxJobsPerRun) {
 					maxJobsReached = true;
 					break;
 				}
 				processSourceKeywordPair(source, keyword, dateFrom, dateTo, counters);
 			}
 			if (maxJobsReached) {
-				log.info("Max jobs per run reached: maxJobsPerRun={}", properties.getMaxJobsPerRun());
+				log.info("Max jobs per run reached: maxJobsPerRun={}", maxJobsPerRun);
 				break;
 			}
 		}
@@ -137,6 +216,8 @@ public class ScrapeJobOrchestrator {
 			ScrapeJob runningJob = scrapeJobService.markRunning(job.getId());
 			ScraperResult result = scraperRunner.run(runningJob);
 			scrapeJobService.markSuccess(job.getId(), result.postsFound(), result.postsSaved());
+			counters.postsFound += result.postsFound();
+			counters.postsSaved += result.postsSaved();
 			counters.jobsSucceeded++;
 		} catch (Exception exception) {
 			counters.jobsFailed++;
@@ -153,11 +234,17 @@ public class ScrapeJobOrchestrator {
 		}
 	}
 
+	private OffsetDateTime nowInZone(ZoneId zoneId) {
+		return schedulerClock.instant().atZone(zoneId).toOffsetDateTime();
+	}
+
 	private static final class RunCounters {
 
 		private int jobsCreated;
 		private int jobsSucceeded;
 		private int jobsFailed;
 		private int jobsSkipped;
+		private int postsFound;
+		private int postsSaved;
 	}
 }
