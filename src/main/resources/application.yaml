@@ -54,6 +54,12 @@ scraper:
     lookback-unit: ${SCRAPER_SCHEDULER_LOOKBACK_UNIT:DAYS}
     max-jobs-per-run: ${SCRAPER_SCHEDULER_MAX_JOBS_PER_RUN:100}
     run-on-startup: ${SCRAPER_SCHEDULER_RUN_ON_STARTUP:false}
+  daily:
+    enabled: ${SCRAPER_DAILY_ENABLED:true}
+    cron: "${SCRAPER_DAILY_CRON:0 0 3 * * *}"
+    zone-id: ${SCRAPER_DAILY_ZONE_ID:Asia/Baku}
+    max-jobs-per-run: ${SCRAPER_DAILY_MAX_JOBS_PER_RUN:100}
+    run-on-startup: ${SCRAPER_DAILY_RUN_ON_STARTUP:false}
   engine:
     max-pages: ${SCRAPER_ENGINE_MAX_PAGES:5}
     max-posts: ${SCRAPER_ENGINE_MAX_POSTS:100}

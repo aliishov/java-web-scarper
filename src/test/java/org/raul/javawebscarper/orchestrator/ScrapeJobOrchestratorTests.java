@@ -2,12 +2,15 @@ package org.raul.javawebscarper.orchestrator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.raul.javawebscarper.config.DailyScrapingProperties;
 import org.raul.javawebscarper.config.ScrapeSchedulerProperties;
+import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
+import org.raul.javawebscarper.scheduler.PreviousDayDateRangeResolver;
 import org.raul.javawebscarper.scraper.ScraperResult;
 import org.raul.javawebscarper.scraper.ScraperRunner;
 import org.raul.javawebscarper.service.KeywordService;
@@ -20,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -40,6 +44,7 @@ class ScrapeJobOrchestratorTests {
 	);
 	private static final LocalDate DATE_FROM = LocalDate.of(2026, 6, 30);
 	private static final LocalDate DATE_TO = LocalDate.of(2026, 7, 1);
+	private static final LocalDate DAILY_DATE_TO = LocalDate.of(2026, 6, 30);
 
 	@Mock
 	private SourceService sourceService;
@@ -54,6 +59,7 @@ class ScrapeJobOrchestratorTests {
 	private ScraperRunner scraperRunner;
 
 	private ScrapeSchedulerProperties properties;
+	private DailyScrapingProperties dailyProperties;
 	private ScrapeJobOrchestrator orchestrator;
 	private Source source;
 	private Keyword keyword;
@@ -65,6 +71,9 @@ class ScrapeJobOrchestratorTests {
 		properties.setLookbackAmount(1);
 		properties.setLookbackUnit(ChronoUnit.DAYS);
 		properties.setMaxJobsPerRun(100);
+		dailyProperties = new DailyScrapingProperties();
+		dailyProperties.setZoneId("Asia/Baku");
+		dailyProperties.setMaxJobsPerRun(100);
 
 		orchestrator = new ScrapeJobOrchestrator(
 				sourceService,
@@ -72,7 +81,9 @@ class ScrapeJobOrchestratorTests {
 				scrapeJobService,
 				scraperRunner,
 				properties,
-				FIXED_CLOCK
+				FIXED_CLOCK,
+				dailyProperties,
+				new PreviousDayDateRangeResolver()
 		);
 
 		source = Source.builder()
@@ -171,5 +182,40 @@ class ScrapeJobOrchestratorTests {
 		verify(scrapeJobService, never()).hasActiveJob(source, secondKeyword, DATE_FROM, DATE_TO);
 		verify(scraperRunner).run(job);
 		verifyNoMoreInteractions(scraperRunner);
+	}
+
+	@Test
+	void createsDailyPreviousDayJobs() {
+		ScrapeJob dailyJob = ScrapeJob.builder()
+				.id(UUID.randomUUID())
+				.source(source)
+				.keyword(keyword)
+				.dateFrom(DATE_FROM)
+				.dateTo(DAILY_DATE_TO)
+				.status(ScrapeJobStatus.PENDING)
+				.build();
+		ScraperResult scraperResult = new ScraperResult(
+				3,
+				2,
+				List.of(UUID.randomUUID(), UUID.randomUUID())
+		);
+		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
+		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
+		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DAILY_DATE_TO)).thenReturn(false);
+		when(scrapeJobService.createPendingJob(source, keyword, DATE_FROM, DAILY_DATE_TO)).thenReturn(dailyJob);
+		when(scrapeJobService.markRunning(dailyJob.getId())).thenReturn(dailyJob);
+		when(scraperRunner.run(dailyJob)).thenReturn(scraperResult);
+
+		DailyScrapeRunResponseDTO response = orchestrator.createAndRunDailyPreviousDayJobs();
+
+		assertThat(response.dateFrom()).isEqualTo(OffsetDateTime.parse("2026-06-30T00:00+04:00"));
+		assertThat(response.dateTo()).isEqualTo(OffsetDateTime.parse("2026-06-30T23:59:59.999999999+04:00"));
+		assertThat(response.zoneId()).isEqualTo("Asia/Baku");
+		assertThat(response.jobsCreated()).isEqualTo(1);
+		assertThat(response.jobsSucceeded()).isEqualTo(1);
+		assertThat(response.jobsFailed()).isZero();
+		assertThat(response.postsFound()).isEqualTo(3);
+		assertThat(response.postsSaved()).isEqualTo(2);
+		verify(scrapeJobService).markSuccess(dailyJob.getId(), 3, 2);
 	}
 }

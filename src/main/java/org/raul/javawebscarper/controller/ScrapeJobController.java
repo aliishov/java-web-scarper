@@ -8,6 +8,7 @@ import org.raul.javawebscarper.dto.common.PageResponseDTO;
 import org.raul.javawebscarper.dto.request.scrapejob.CompleteScrapeJobRequestDTO;
 import org.raul.javawebscarper.dto.request.scrapejob.FailScrapeJobRequestDTO;
 import org.raul.javawebscarper.dto.request.scrapejob.CreateScrapeJobRequestDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
@@ -68,6 +69,15 @@ public class ScrapeJobController {
 	public ResponseEntity<BaseResponseDTO<ScheduledScrapeRunResponseDTO>> runScheduled() {
 		ScheduledScrapeRunResponseDTO response = scrapeJobOrchestrator.createAndRunScheduledJobs();
 		return ResponseEntity.ok(BaseResponseDTO.success(response, "Scheduled scrape run completed successfully"));
+	}
+
+	@PostMapping("/run-daily-previous-day")
+	public ResponseEntity<BaseResponseDTO<DailyScrapeRunResponseDTO>> runDailyPreviousDay() {
+		DailyScrapeRunResponseDTO response = scrapeJobOrchestrator.createAndRunDailyPreviousDayJobs();
+		return ResponseEntity.ok(BaseResponseDTO.success(
+				response,
+				"Daily previous-day scrape run completed successfully"
+		));
 	}
 
 	@GetMapping("/{id}")
