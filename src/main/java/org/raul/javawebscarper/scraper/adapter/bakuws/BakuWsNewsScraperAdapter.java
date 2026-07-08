@@ -56,6 +56,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	private static final String ARTICLE_DATE_MONTH_SELECTOR = ".post-detail-top .post-detail-img .post-date-month";
 	private static final String ARTICLE_DATE_YEAR_SELECTOR = ".post-detail-top .post-detail-img .post-date-year";
 	private static final String ARTICLE_DATE_TIME_SELECTOR = ".post-detail-top .post-detail-img .post-date-time";
+	private static final String ARTICLE_TEXT_CONTENT_SELECTOR = ".post-detail-content.resize-area";
 	private static final String[] ARTICLE_ROOT_SELECTORS = {
 			".post-detail.post-detail-area",
 			".post-detail",
@@ -84,9 +85,24 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			"header",
 			"form",
 			"iframe",
+			"ins",
 			"noscript",
+			"template",
 			".cat-left-bnr",
 			".side-bnr",
+			".bnr-is-post",
+			".AdviadNativeVideo",
+			".social-media-banner",
+			".tag-area",
+			"[data-ad-id]",
+			"[data-name=adWrapper]",
+			"[href*=yandex]",
+			"[src*=yandex]",
+			"[href*='avatars.mds']",
+			"[src*='avatars.mds']",
+			"[id^=yandex_rtb]",
+			"[id*=yandex]",
+			"[class*=yandex]",
 			"[id*=bnr]",
 			"[class*=bnr]",
 			"[class*=banner]",
@@ -459,7 +475,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 
 	String extractArticleText(Document document, BakuWsSearchResultCard card) {
 		String bestText = null;
-		for (Element root : findArticleRoots(document)) {
+		for (Element root : findArticleTextRoots(document)) {
 			String paragraphText = extractParagraphText(root);
 			if (isUsableArticleText(paragraphText)) {
 				if (isBetterArticleText(paragraphText, bestText)) {
@@ -489,6 +505,17 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		return null;
 	}
 
+	private List<Element> findArticleTextRoots(Document document) {
+		List<Element> roots = new ArrayList<>();
+		Set<Element> seen = new LinkedHashSet<>();
+		for (Element root : document.select(ARTICLE_TEXT_CONTENT_SELECTOR)) {
+			if (seen.add(root)) {
+				roots.add(root);
+			}
+		}
+		return roots;
+	}
+
 	private List<Element> findArticleRoots(Document document) {
 		List<Element> roots = new ArrayList<>();
 		Set<Element> seen = new LinkedHashSet<>();
@@ -503,8 +530,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	}
 
 	private String extractParagraphText(Element root) {
-		Element cleanRoot = root.clone();
-		cleanRoot.select(CLEANUP_SELECTOR).remove();
+		Element cleanRoot = cleanedArticleContent(root);
 		List<String> paragraphs = cleanRoot
 				.select("p")
 				.stream()
@@ -517,10 +543,25 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	}
 
 	private String extractRootText(Element root) {
-		Element cleanElement = root.clone();
-		cleanElement.select(CLEANUP_SELECTOR).remove();
+		Element cleanElement = cleanedArticleContent(root);
 		String text = normalizeArticleText(cleanElement.text());
 		return isUsableArticleText(text) ? text : null;
+	}
+
+	private Element cleanedArticleContent(Element root) {
+		Element cleanRoot = root.clone();
+		cleanRoot.select(CLEANUP_SELECTOR).remove();
+		cleanRoot.select("*")
+				.stream()
+				.filter(this::isAdOnlyElement)
+				.toList()
+				.forEach(Element::remove);
+		return cleanRoot;
+	}
+
+	private boolean isAdOnlyElement(Element element) {
+		String text = normalizeArticleText(element.ownText());
+		return text != null && "ad".equalsIgnoreCase(text);
 	}
 
 	private boolean isArticleParagraph(String text) {
@@ -532,7 +573,16 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 				.replace("ü", "u");
 		return !normalized.equals("dili secin")
 				&& !normalized.equals("son xeberler")
-				&& !normalized.equals("butun xeberler");
+				&& !normalized.equals("butun xeberler")
+				&& !containsAdvertisingNoise(normalized);
+	}
+
+	private boolean containsAdvertisingNoise(String normalizedText) {
+		return normalizedText.contains("yandex")
+				|| normalizedText.contains("avatars.mds")
+				|| normalizedText.contains("colizeum")
+				|| normalizedText.contains("reklam")
+				|| normalizedText.contains("banner");
 	}
 
 	private boolean isBetterArticleText(String candidate, String current) {

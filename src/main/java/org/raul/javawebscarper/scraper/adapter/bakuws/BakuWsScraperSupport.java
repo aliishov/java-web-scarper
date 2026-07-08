@@ -53,11 +53,15 @@ public final class BakuWsScraperSupport {
 		}
 		String normalized = mediaUrl.toLowerCase(Locale.ROOT);
 		return !normalized.startsWith("data:image")
+				&& !normalized.contains("yandex")
+				&& !normalized.contains("avatars.mds")
 				&& !normalized.contains("/images/banners/")
 				&& !normalized.contains("/assets/banners/")
 				&& !normalized.contains("placeholder")
 				&& !normalized.contains("placeholder_home")
 				&& !normalized.contains("icons-v6.svg")
+				&& !normalized.contains("/icons/")
+				&& !normalized.contains("icon")
 				&& !normalized.contains("sprite")
 				&& !normalized.contains("logo")
 				&& !normalized.contains("banner");
