@@ -46,6 +46,17 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	private static final String RESULT_CARD_SELECTOR = ".post-item";
 	private static final int MIN_ARTICLE_TEXT_LENGTH = 50;
 	private static final int MIN_PARAGRAPH_TEXT_LENGTH = 20;
+	private static final String ARTICLE_MAIN_IMAGE_SELECTOR = String.join(", ",
+			".post-detail-top .post-detail-img > img[src]",
+			".post-detail-top .post-detail-img > img[data-src]",
+			".post-detail-top .post-detail-img > img[srcset]",
+			".post-detail-top .post-detail-img > img[data-srcset]"
+	);
+	private static final String ARTICLE_DATE_DAY_SELECTOR = ".post-detail-top .post-detail-img .post-date-day";
+	private static final String ARTICLE_DATE_MONTH_SELECTOR = ".post-detail-top .post-detail-img .post-date-month";
+	private static final String ARTICLE_DATE_YEAR_SELECTOR = ".post-detail-top .post-detail-img .post-date-year";
+	private static final String ARTICLE_DATE_TIME_SELECTOR = ".post-detail-top .post-detail-img .post-date-time";
+	private static final String ARTICLE_TEXT_CONTENT_SELECTOR = ".post-detail-content.resize-area";
 	private static final String[] ARTICLE_ROOT_SELECTORS = {
 			".post-detail.post-detail-area",
 			".post-detail",
@@ -74,9 +85,24 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			"header",
 			"form",
 			"iframe",
+			"ins",
 			"noscript",
+			"template",
 			".cat-left-bnr",
 			".side-bnr",
+			".bnr-is-post",
+			".AdviadNativeVideo",
+			".social-media-banner",
+			".tag-area",
+			"[data-ad-id]",
+			"[data-name=adWrapper]",
+			"[href*=yandex]",
+			"[src*=yandex]",
+			"[href*='avatars.mds']",
+			"[src*='avatars.mds']",
+			"[id^=yandex_rtb]",
+			"[id*=yandex]",
+			"[class*=yandex]",
 			"[id*=bnr]",
 			"[class*=bnr]",
 			"[class*=banner]",
@@ -88,16 +114,6 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			".post-detail-img",
 			".similar-news",
 			".related-news"
-	);
-	private static final String MEDIA_SELECTOR = String.join(", ",
-			"img[src]",
-			"img[data-src]",
-			"picture img[src]",
-			"picture img[data-src]",
-			"picture source[srcset]",
-			"video[src]",
-			"video source[src]",
-			"source[src]"
 	);
 	private static final ScrapedAuthorDTO AUTHOR = new ScrapedAuthorDTO(
 			"baku.ws",
@@ -443,28 +459,23 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		));
 	}
 
-	private Optional<OffsetDateTime> parseArticleDate(Document document) {
-		String day = text(document, ".post-date-day");
-		String month = text(document, ".post-date-month");
-		String year = text(document, ".post-date-year");
-		String time = text(document, ".post-date-time");
+	Optional<OffsetDateTime> parseArticleDate(Document document) {
+		String day = text(document, ARTICLE_DATE_DAY_SELECTOR);
+		String month = text(document, ARTICLE_DATE_MONTH_SELECTOR);
+		String year = text(document, ARTICLE_DATE_YEAR_SELECTOR);
+		String time = text(document, ARTICLE_DATE_TIME_SELECTOR);
 		if (day != null && month != null && year != null && time != null) {
 			Optional<OffsetDateTime> parsedDate = dateParser.parseArticleDate(day, month, year, time);
 			if (parsedDate.isPresent()) {
 				return parsedDate;
 			}
 		}
-		return firstMetaContent(
-				document,
-				"meta[property=article:published_time]",
-				"meta[name=publish_date]",
-				"meta[itemprop=datePublished]"
-		).flatMap(this::parseOffsetDateTime);
+		return Optional.empty();
 	}
 
 	String extractArticleText(Document document, BakuWsSearchResultCard card) {
 		String bestText = null;
-		for (Element root : findArticleRoots(document)) {
+		for (Element root : findArticleTextRoots(document)) {
 			String paragraphText = extractParagraphText(root);
 			if (isUsableArticleText(paragraphText)) {
 				if (isBetterArticleText(paragraphText, bestText)) {
@@ -494,6 +505,17 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		return null;
 	}
 
+	private List<Element> findArticleTextRoots(Document document) {
+		List<Element> roots = new ArrayList<>();
+		Set<Element> seen = new LinkedHashSet<>();
+		for (Element root : document.select(ARTICLE_TEXT_CONTENT_SELECTOR)) {
+			if (seen.add(root)) {
+				roots.add(root);
+			}
+		}
+		return roots;
+	}
+
 	private List<Element> findArticleRoots(Document document) {
 		List<Element> roots = new ArrayList<>();
 		Set<Element> seen = new LinkedHashSet<>();
@@ -508,8 +530,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	}
 
 	private String extractParagraphText(Element root) {
-		Element cleanRoot = root.clone();
-		cleanRoot.select(CLEANUP_SELECTOR).remove();
+		Element cleanRoot = cleanedArticleContent(root);
 		List<String> paragraphs = cleanRoot
 				.select("p")
 				.stream()
@@ -522,10 +543,25 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	}
 
 	private String extractRootText(Element root) {
-		Element cleanElement = root.clone();
-		cleanElement.select(CLEANUP_SELECTOR).remove();
+		Element cleanElement = cleanedArticleContent(root);
 		String text = normalizeArticleText(cleanElement.text());
 		return isUsableArticleText(text) ? text : null;
+	}
+
+	private Element cleanedArticleContent(Element root) {
+		Element cleanRoot = root.clone();
+		cleanRoot.select(CLEANUP_SELECTOR).remove();
+		cleanRoot.select("*")
+				.stream()
+				.filter(this::isAdOnlyElement)
+				.toList()
+				.forEach(Element::remove);
+		return cleanRoot;
+	}
+
+	private boolean isAdOnlyElement(Element element) {
+		String text = normalizeArticleText(element.ownText());
+		return text != null && "ad".equalsIgnoreCase(text);
 	}
 
 	private boolean isArticleParagraph(String text) {
@@ -537,7 +573,16 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 				.replace("ü", "u");
 		return !normalized.equals("dili secin")
 				&& !normalized.equals("son xeberler")
-				&& !normalized.equals("butun xeberler");
+				&& !normalized.equals("butun xeberler")
+				&& !containsAdvertisingNoise(normalized);
+	}
+
+	private boolean containsAdvertisingNoise(String normalizedText) {
+		return normalizedText.contains("yandex")
+				|| normalizedText.contains("avatars.mds")
+				|| normalizedText.contains("colizeum")
+				|| normalizedText.contains("reklam")
+				|| normalizedText.contains("banner");
 	}
 
 	private boolean isBetterArticleText(String candidate, String current) {
@@ -566,9 +611,8 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 
 	List<ScrapedMediaDTO> extractMedia(Document document, BakuWsSearchResultCard card) {
 		Map<String, MediaType> mediaByUrl = new LinkedHashMap<>();
-		for (Element root : findArticleRoots(document)) {
-			collectMedia(root, card.postUrl(), mediaByUrl);
-		}
+		extractMainImageUrl(document, card.postUrl())
+				.ifPresent(mediaUrl -> mediaByUrl.put(mediaUrl, MediaType.IMAGE));
 		if (mediaByUrl.isEmpty() && card.thumbnailUrl() != null) {
 			mediaByUrl.put(card.thumbnailUrl(), MediaType.IMAGE);
 		}
@@ -581,28 +625,24 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		return media;
 	}
 
-	private void collectMedia(Element root, String baseUrl, Map<String, MediaType> mediaByUrl) {
-		for (Element element : root.select(MEDIA_SELECTOR)) {
-			String rawUrl = firstNonBlank(
-					element.attr("src"),
-					element.attr("data-src"),
-					firstSrcsetUrl(element.attr("srcset")),
-					firstSrcsetUrl(element.attr("data-srcset"))
-			);
-			if (rawUrl == null) {
-				continue;
-			}
-			if (!BakuWsScraperSupport.isAllowedMediaUrl(rawUrl)) {
-				continue;
-			}
-			String normalizedUrl = UrlNormalizer.resolve(baseUrl, rawUrl);
-			if (BakuWsScraperSupport.isAllowedMediaUrl(normalizedUrl)) {
-				mediaByUrl.putIfAbsent(
-						normalizedUrl,
-						BakuWsScraperSupport.mediaTypeForTag(element.tagName(), element.parent() == null ? null : element.parent().tagName())
-				);
-			}
+	private Optional<String> extractMainImageUrl(Document document, String baseUrl) {
+		Element image = document.selectFirst(ARTICLE_MAIN_IMAGE_SELECTOR);
+		if (image == null) {
+			return Optional.empty();
 		}
+		String rawUrl = firstNonBlank(
+				image.attr("src"),
+				image.attr("data-src"),
+				firstSrcsetUrl(image.attr("srcset")),
+				firstSrcsetUrl(image.attr("data-srcset"))
+		);
+		if (rawUrl == null || !BakuWsScraperSupport.isAllowedMediaUrl(rawUrl)) {
+			return Optional.empty();
+		}
+		String normalizedUrl = UrlNormalizer.resolve(baseUrl, rawUrl);
+		return BakuWsScraperSupport.isAllowedMediaUrl(normalizedUrl)
+				? Optional.of(normalizedUrl)
+				: Optional.empty();
 	}
 
 	private String firstSrcsetUrl(String srcset) {

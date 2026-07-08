@@ -42,7 +42,7 @@ class BakuWsNewsScraperAdapterTests {
 	}
 
 	@Test
-	void extractsArticleTextFromPostDetailParagraphs() {
+	void extractsArticleTextFromPostDetailContentParagraphs() {
 		Document document = Jsoup.parse("""
 				<html>
 				  <body>
@@ -50,11 +50,13 @@ class BakuWsNewsScraperAdapterTests {
 				      <div class="post-detail post-detail-area">
 				        <div class="post-detail-title"><h1>Title must not be part of body text</h1></div>
 				        <div class="post-date">07 iyl 2026 11:45</div>
-				        <p>Dili seçin</p>
-				        <p>Səfərbərlik və Hərbi Xidmətə Çağırış üzrə Dövlət Xidmətinin vəzifəli şəxsi barəsində cinayət işi açılıb.</p>
-				        <p>Bu barədə BAKU.WS-ə Baş Prokurorluğun Mətbuat xidməti məlumat yayıb və istintaqın davam etdiyi bildirilib.</p>
-				        <div class="related-news">
-				          <p>Related article text should be ignored even when it is long enough to look like content.</p>
+				        <div class="post-detail-content resize-area">
+				          <p>Dili secin</p>
+				          <p><strong>State service opened a criminal case after reviewing official materials in detail.</strong></p>
+				          <p>The press office said the investigation continues and additional public information will be shared later.</p>
+				          <div class="related-news">
+				            <p>Related article text should be ignored even when it is long enough to look like content.</p>
+				          </div>
 				        </div>
 				      </div>
 				    </section>
@@ -65,19 +67,19 @@ class BakuWsNewsScraperAdapterTests {
 		String text = adapter.extractArticleText(document, articleCard());
 
 		assertThat(text)
-				.contains("Səfərbərlik və Hərbi Xidmətə Çağırış üzrə Dövlət Xidmətinin")
-				.contains("Baş Prokurorluğun Mətbuat xidməti")
-				.doesNotContain("Dili seçin")
+				.contains("State service opened a criminal case")
+				.contains("The press office said the investigation continues")
+				.doesNotContain("Dili secin")
 				.doesNotContain("Title must not be part")
 				.doesNotContain("Related article text should be ignored");
 	}
 
 	@Test
-	void fallsBackToMetaDescriptionWhenArticleRootIsMissing() {
+	void fallsBackToMetaDescriptionWhenArticleContentIsMissing() {
 		Document document = Jsoup.parse("""
 				<html>
 				  <head>
-				    <meta property="og:description" content="Bu fallback mətn kifayət qədər uzundur və article root tapılmadıqda istifadə olunmalıdır.">
+				    <meta property="og:description" content="This fallback article description is long enough to be used when article content is missing.">
 				  </head>
 				  <body></body>
 				</html>
@@ -85,28 +87,65 @@ class BakuWsNewsScraperAdapterTests {
 
 		String text = adapter.extractArticleText(document, articleCard());
 
-		assertThat(text).contains("fallback mətn kifayət qədər uzundur");
+		assertThat(text).contains("fallback article description is long enough");
 	}
 
 	@Test
-	void extractsArticleMediaAndFiltersNoise() {
+	void parsesArticleDateTimeFromPostDetailImageBlock() {
 		Document document = Jsoup.parse("""
 				<html>
 				  <body>
-				    <section class="news-detail">
-				      <div class="post-detail post-detail-area">
-				        <img src="/storage/photos/2026/07/article.webp">
-				        <picture>
-				          <source srcset="/storage/photos/2026/07/picture.webp 1x, /storage/photos/2026/07/picture-large.webp 2x">
-				        </picture>
-				        <video>
-				          <source src="/storage/videos/2026/07/video.mp4">
-				        </video>
-				        <img src="/images/banners/ad.jpg">
-				        <img src="data:image/png;base64,AAAA">
-				        <img src="/storage/logo.png">
+				    <div class="post-date">
+				      <span class="post-date-day">01</span>
+				      <span class="post-date-month">iyn</span>
+				      <span class="post-date-year">2026</span>
+				      <span class="post-date-time">10:15</span>
+				    </div>
+				    <div class="post-detail post-detail-area">
+				      <div class="post-detail-top">
+				        <div class="post-detail-img">
+				          <img src="/storage/photos/2026/07/article.webp">
+				          <div class="post-date">
+				            <span class="post-date-inner">
+				              <span class="post-date-day">07</span>
+				              <span class="post-date-month">iyl</span>
+				            </span>
+				            <span class="post-date-year">2026</span>
+				            <span class="post-date-time">23:36</span>
+				          </div>
+				        </div>
 				      </div>
-				    </section>
+				    </div>
+				  </body>
+				</html>
+				""", "https://baku.ws/incident/example");
+
+		assertThat(adapter.parseArticleDate(document))
+				.contains(OffsetDateTime.parse("2026-07-07T23:36:00+04:00"));
+	}
+
+	@Test
+	void extractsArticleMediaOnlyFromPostDetailMainImage() {
+		Document document = Jsoup.parse("""
+				<html>
+				  <body>
+				    <div class="post-detail post-detail-area">
+				      <div class="post-detail-top">
+				        <div class="post-detail-img">
+				          <img src="/storage/photos/2026/07/article.webp">
+				        </div>
+				      </div>
+				      <div class="post-detail-content resize-area">
+				        <img src="https://avatars.mds.yandex.net/ad-image.jpg">
+				        <img src="/storage/photos/2026/07/content-image-should-not-be-used.webp">
+				      </div>
+				    </div>
+				    <aside class="sidebar">
+				      <img src="/storage/photos/2026/07/sidebar.webp">
+				    </aside>
+				    <div class="related-news">
+				      <img src="/storage/photos/2026/07/related.webp">
+				    </div>
 				  </body>
 				</html>
 				""", "https://baku.ws/incident/example");
@@ -115,26 +154,22 @@ class BakuWsNewsScraperAdapterTests {
 
 		assertThat(media)
 				.extracting(ScrapedMediaDTO::mediaUrl)
-				.containsExactly(
-						"https://baku.ws/storage/photos/2026/07/article.webp",
-						"https://baku.ws/storage/photos/2026/07/picture.webp",
-						"https://baku.ws/storage/videos/2026/07/video.mp4"
-				);
+				.containsExactly("https://baku.ws/storage/photos/2026/07/article.webp");
 		assertThat(media)
 				.extracting(ScrapedMediaDTO::mediaType)
-				.containsExactly(MediaType.IMAGE, MediaType.IMAGE, MediaType.VIDEO);
+				.containsExactly(MediaType.IMAGE);
 	}
 
 	@Test
-	void usesSearchThumbnailWhenArticleHasNoAllowedMedia() {
+	void usesSearchThumbnailWhenArticleMainImageIsMissing() {
 		Document document = Jsoup.parse("""
 				<html>
 				  <body>
-				    <section class="news-detail">
-				      <div class="post-detail post-detail-area">
-				        <img src="/images/banners/ad.jpg">
+				    <div class="post-detail post-detail-area">
+				      <div class="post-detail-content resize-area">
+				        <img src="/storage/photos/2026/07/content-image-should-not-be-used.webp">
 				      </div>
-				    </section>
+				    </div>
 				  </body>
 				</html>
 				""", "https://baku.ws/incident/example");
@@ -144,6 +179,38 @@ class BakuWsNewsScraperAdapterTests {
 		assertThat(media)
 				.extracting(ScrapedMediaDTO::mediaUrl)
 				.containsExactly("https://baku.ws/storage/photos/thumbnail.webp");
+	}
+
+	@Test
+	void removesYandexAdsFromArticleText() {
+		Document document = Jsoup.parse("""
+				<html>
+				  <body>
+				    <div class="post-detail post-detail-area">
+				      <div class="post-detail-content resize-area">
+				        <p><strong>Main article paragraph has useful text and should be preserved by the extractor.</strong></p>
+				        <div id="yandex_rtb_R-A-13706460-6-555577" data-name="adWrapper">
+				          <p>Ad yandex colizeumarena https://avatars.mds.yandex.net/banner.jpg</p>
+				          <img src="https://avatars.mds.yandex.net/ad.jpg">
+				        </div>
+				        <script>window.yaContextCb = window.yaContextCb || [];</script>
+				        <ins>Ad</ins>
+				        <p>The second article paragraph is also useful and must stay in the result text.</p>
+				      </div>
+				    </div>
+				  </body>
+				</html>
+				""", "https://baku.ws/incident/example");
+
+		String text = adapter.extractArticleText(document, articleCard());
+
+		assertThat(text)
+				.contains("Main article paragraph has useful text")
+				.contains("The second article paragraph is also useful")
+				.doesNotContain("yandex")
+				.doesNotContain("colizeumarena")
+				.doesNotContain("avatars.mds.yandex.net")
+				.doesNotContain("Ad");
 	}
 
 	private BakuWsSearchResultCard articleCard() {
