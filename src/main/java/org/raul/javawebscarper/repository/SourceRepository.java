@@ -2,6 +2,7 @@ package org.raul.javawebscarper.repository;
 
 import org.raul.javawebscarper.model.Source;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -17,5 +18,6 @@ public interface SourceRepository extends JpaRepository<Source, Integer> {
 
 	boolean existsByCodeAndIdNot(String code, Integer id);
 
+	@EntityGraph(attributePaths = "supportedLanguages")
 	List<Source> findByEnabledTrue();
 }

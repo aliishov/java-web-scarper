@@ -16,6 +16,7 @@ import org.raul.javawebscarper.scraper.ScraperResult;
 import org.raul.javawebscarper.scraper.ScraperRunner;
 import org.raul.javawebscarper.service.KeywordService;
 import org.raul.javawebscarper.service.ScrapeJobService;
+import org.raul.javawebscarper.service.SourceLanguageSupportService;
 import org.raul.javawebscarper.service.SourceService;
 import org.springframework.stereotype.Service;
 
@@ -38,6 +39,7 @@ public class ScrapeJobOrchestrator {
 	private final Clock schedulerClock;
 	private final DailyScrapingProperties dailyProperties;
 	private final PreviousDayDateRangeResolver previousDayDateRangeResolver;
+	private final SourceLanguageSupportService sourceLanguageSupportService;
 
 	public ScheduledScrapeRunResponseDTO createAndRunScheduledJobs() {
 		OffsetDateTime startedAt = OffsetDateTime.now(schedulerClock);
@@ -188,6 +190,22 @@ public class ScrapeJobOrchestrator {
 			boolean skipExistingRunType,
 			RunCounters counters
 	) {
+		if (!sourceLanguageSupportService.isSupported(source, keyword)) {
+			counters.jobsSkipped++;
+			log.info(
+					"Skipping scrape job due to unsupported language: source={}, sourceLanguages={}, keyword={}, "
+							+ "keywordLanguage={}, dateFrom={}, dateTo={}, runType={}",
+					source.getCode(),
+					source.getSupportedLanguages(),
+					keyword.getWord(),
+					keyword.getLanguage(),
+					dateFrom,
+					dateTo,
+					runType
+			);
+			return;
+		}
+
 		if (skipExistingRunType && scrapeJobService.hasJobForRunType(source, keyword, dateFrom, dateTo, runType)) {
 			counters.jobsSkipped++;
 			log.info(
