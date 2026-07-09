@@ -9,6 +9,7 @@ import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponse
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.scheduler.PreviousDayDateRangeResolver;
 import org.raul.javawebscarper.scheduler.ScrapeDateRange;
 import org.raul.javawebscarper.scraper.ScraperResult;
@@ -62,7 +63,9 @@ public class ScrapeJobOrchestrator {
 				keywords,
 				dateFrom,
 				dateTo,
-				schedulerProperties.getMaxJobsPerRun()
+				schedulerProperties.getMaxJobsPerRun(),
+				ScrapeJobRunType.SCHEDULED,
+				false
 		);
 		OffsetDateTime finishedAt = OffsetDateTime.now(schedulerClock);
 
@@ -114,7 +117,9 @@ public class ScrapeJobOrchestrator {
 				keywords,
 				dateRange.fromLocalDate(),
 				dateRange.toLocalDate(),
-				dailyProperties.getMaxJobsPerRun()
+				dailyProperties.getMaxJobsPerRun(),
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY,
+				true
 		);
 		OffsetDateTime finishedAt = nowInZone(zoneId);
 
@@ -151,7 +156,9 @@ public class ScrapeJobOrchestrator {
 			List<Keyword> keywords,
 			LocalDate dateFrom,
 			LocalDate dateTo,
-			int maxJobsPerRun
+			int maxJobsPerRun,
+			ScrapeJobRunType runType,
+			boolean skipExistingRunType
 	) {
 		RunCounters counters = new RunCounters();
 		boolean maxJobsReached = false;
@@ -162,7 +169,7 @@ public class ScrapeJobOrchestrator {
 					maxJobsReached = true;
 					break;
 				}
-				processSourceKeywordPair(source, keyword, dateFrom, dateTo, counters);
+				processSourceKeywordPair(source, keyword, dateFrom, dateTo, runType, skipExistingRunType, counters);
 			}
 			if (maxJobsReached) {
 				log.info("Max jobs per run reached: maxJobsPerRun={}", maxJobsPerRun);
@@ -177,32 +184,50 @@ public class ScrapeJobOrchestrator {
 			Keyword keyword,
 			LocalDate dateFrom,
 			LocalDate dateTo,
+			ScrapeJobRunType runType,
+			boolean skipExistingRunType,
 			RunCounters counters
 	) {
-		if (scrapeJobService.hasActiveJob(source, keyword, dateFrom, dateTo)) {
+		if (skipExistingRunType && scrapeJobService.hasJobForRunType(source, keyword, dateFrom, dateTo, runType)) {
 			counters.jobsSkipped++;
-			log.debug(
-					"Skipping duplicate active scrape job: source={}, keyword={}, dateFrom={}, dateTo={}",
+			log.info(
+					"Skipping duplicate scrape job for run type: source={}, keyword={}, dateFrom={}, dateTo={}, "
+							+ "runType={}",
 					source.getCode(),
 					keyword.getWord(),
 					dateFrom,
-					dateTo
+					dateTo,
+					runType
+			);
+			return;
+		}
+
+		if (scrapeJobService.hasActiveJob(source, keyword, dateFrom, dateTo)) {
+			counters.jobsSkipped++;
+			log.debug(
+					"Skipping duplicate active scrape job: source={}, keyword={}, dateFrom={}, dateTo={}, runType={}",
+					source.getCode(),
+					keyword.getWord(),
+					dateFrom,
+					dateTo,
+					runType
 			);
 			return;
 		}
 
 		ScrapeJob job;
 		try {
-			job = scrapeJobService.createPendingJob(source, keyword, dateFrom, dateTo);
+			job = scrapeJobService.createPendingJob(source, keyword, dateFrom, dateTo, runType);
 			counters.jobsCreated++;
 		} catch (Exception exception) {
 			counters.jobsSkipped++;
 			log.error(
-					"Failed to create scheduled scrape job: source={}, keyword={}, dateFrom={}, dateTo={}",
+					"Failed to create scheduled scrape job: source={}, keyword={}, dateFrom={}, dateTo={}, runType={}",
 					source.getCode(),
 					keyword.getWord(),
 					dateFrom,
 					dateTo,
+					runType,
 					exception
 			);
 			return;

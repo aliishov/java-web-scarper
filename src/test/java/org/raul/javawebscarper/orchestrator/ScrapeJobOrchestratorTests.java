@@ -9,6 +9,7 @@ import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponse
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 import org.raul.javawebscarper.scheduler.PreviousDayDateRangeResolver;
 import org.raul.javawebscarper.scraper.ScraperResult;
@@ -112,7 +113,13 @@ class ScrapeJobOrchestratorTests {
 		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
 		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
 		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DATE_TO)).thenReturn(false);
-		when(scrapeJobService.createPendingJob(source, keyword, DATE_FROM, DATE_TO)).thenReturn(job);
+		when(scrapeJobService.createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		)).thenReturn(job);
 		when(scrapeJobService.markRunning(job.getId())).thenReturn(job);
 		when(scraperRunner.run(job)).thenReturn(ScraperResult.empty());
 
@@ -139,7 +146,13 @@ class ScrapeJobOrchestratorTests {
 		assertThat(response.jobsSucceeded()).isZero();
 		assertThat(response.jobsFailed()).isZero();
 		assertThat(response.jobsSkipped()).isEqualTo(1);
-		verify(scrapeJobService, never()).createPendingJob(source, keyword, DATE_FROM, DATE_TO);
+		verify(scrapeJobService, never()).createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		);
 	}
 
 	@Test
@@ -148,7 +161,13 @@ class ScrapeJobOrchestratorTests {
 		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
 		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
 		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DATE_TO)).thenReturn(false);
-		when(scrapeJobService.createPendingJob(source, keyword, DATE_FROM, DATE_TO)).thenReturn(job);
+		when(scrapeJobService.createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		)).thenReturn(job);
 		when(scrapeJobService.markRunning(job.getId())).thenReturn(job);
 		when(scraperRunner.run(job)).thenThrow(scraperFailure);
 
@@ -172,7 +191,13 @@ class ScrapeJobOrchestratorTests {
 		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
 		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword, secondKeyword));
 		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DATE_TO)).thenReturn(false);
-		when(scrapeJobService.createPendingJob(source, keyword, DATE_FROM, DATE_TO)).thenReturn(job);
+		when(scrapeJobService.createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		)).thenReturn(job);
 		when(scrapeJobService.markRunning(job.getId())).thenReturn(job);
 		when(scraperRunner.run(job)).thenReturn(ScraperResult.empty());
 
@@ -201,8 +226,21 @@ class ScrapeJobOrchestratorTests {
 		);
 		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
 		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
+		when(scrapeJobService.hasJobForRunType(
+				source,
+				keyword,
+				DATE_FROM,
+				DAILY_DATE_TO,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY
+		)).thenReturn(false);
 		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DAILY_DATE_TO)).thenReturn(false);
-		when(scrapeJobService.createPendingJob(source, keyword, DATE_FROM, DAILY_DATE_TO)).thenReturn(dailyJob);
+		when(scrapeJobService.createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DAILY_DATE_TO,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY
+		)).thenReturn(dailyJob);
 		when(scrapeJobService.markRunning(dailyJob.getId())).thenReturn(dailyJob);
 		when(scraperRunner.run(dailyJob)).thenReturn(scraperResult);
 
