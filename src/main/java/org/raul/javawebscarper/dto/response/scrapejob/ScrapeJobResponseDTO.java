@@ -1,5 +1,6 @@
 package org.raul.javawebscarper.dto.response.scrapejob;
 
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 
 import java.time.LocalDate;
@@ -14,6 +15,7 @@ public record ScrapeJobResponseDTO(
 		String keywordWord,
 		LocalDate dateFrom,
 		LocalDate dateTo,
+		ScrapeJobRunType runType,
 		ScrapeJobStatus status,
 		OffsetDateTime startedAt,
 		OffsetDateTime finishedAt,

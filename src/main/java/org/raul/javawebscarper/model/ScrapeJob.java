@@ -21,6 +21,7 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 
 import java.time.LocalDate;
@@ -35,7 +36,11 @@ import java.util.UUID;
 				@Index(name = "idx_scrape_jobs_source_status", columnList = "source_id,status"),
 				@Index(name = "idx_scrape_jobs_keyword_status", columnList = "keyword_id,status"),
 				@Index(name = "idx_scrape_jobs_created_at", columnList = "created_at"),
-				@Index(name = "idx_scrape_jobs_started_at", columnList = "started_at")
+				@Index(name = "idx_scrape_jobs_started_at", columnList = "started_at"),
+				@Index(
+						name = "idx_scrape_jobs_source_keyword_dates_run_type",
+						columnList = "source_id,keyword_id,date_from,date_to,run_type"
+				)
 		}
 )
 @Getter
@@ -65,6 +70,11 @@ public class ScrapeJob extends BaseEntity {
 
 	@Column(name = "date_to", nullable = false)
 	LocalDate dateTo;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "run_type", nullable = false, length = 50)
+	@Builder.Default
+	ScrapeJobRunType runType = ScrapeJobRunType.SCHEDULED;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false, length = 32)
