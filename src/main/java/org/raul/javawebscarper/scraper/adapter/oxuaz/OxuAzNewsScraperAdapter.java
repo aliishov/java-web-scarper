@@ -10,10 +10,16 @@ import org.raul.javawebscarper.browser.BrowserEngineException;
 import org.raul.javawebscarper.browser.BrowserPage;
 import org.raul.javawebscarper.browser.BrowserSession;
 import org.raul.javawebscarper.browser.BrowserSessionFactory;
+import org.raul.javawebscarper.browser.BrowserTimeoutException;
+import org.raul.javawebscarper.dto.scraper.ScrapedAuthorDTO;
+import org.raul.javawebscarper.dto.scraper.ScrapedMediaDTO;
+import org.raul.javawebscarper.dto.scraper.ScrapedPostDTO;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.MediaType;
 import org.raul.javawebscarper.scraper.adapter.NewsScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
+import org.raul.javawebscarper.scraper.engine.ScraperExecutionStatus;
 import org.raul.javawebscarper.scraper.support.DateRangeValidator;
 import org.raul.javawebscarper.scraper.support.UrlNormalizer;
 import org.springframework.stereotype.Component;
@@ -21,9 +27,11 @@ import org.springframework.stereotype.Component;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +46,68 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 	private static final String RESULT_CARD_SELECTOR = String.join(", ",
 			"div.rt-news-item[data-url]",
 			"div.col-12.col-sm-6.col-md-6.col-lg-6.rt-news-item"
+	);
+	private static final int MIN_ARTICLE_TEXT_LENGTH = 50;
+	private static final int MIN_PARAGRAPH_TEXT_LENGTH = 20;
+	private static final String ARTICLE_DATE_SELECTOR = String.join(", ",
+			"article time[datetime]",
+			"main time[datetime]",
+			"article time",
+			"main time",
+			".post-item-meta span",
+			".post-detail-date",
+			".news-inner__info li",
+			"[class*='date']",
+			"[class*='time']"
+	);
+	private static final String[] ARTICLE_ROOT_SELECTORS = {
+			"article .post-detail-content",
+			"article .news-inner__desc",
+			".post-detail-content",
+			".news-inner__desc",
+			"[class*='detail'] [class*='content']",
+			"main article",
+			"article",
+			".rt-news-item[data-url]",
+			"[class*='detail']",
+			"[class*='content']"
+	};
+	private static final String CLEANUP_SELECTOR = String.join(", ",
+			"script",
+			"style",
+			"nav",
+			"footer",
+			"aside",
+			"header",
+			"form",
+			"iframe",
+			"ins",
+			"noscript",
+			"template",
+			".seo__tags",
+			"[class*=share]",
+			"[class*=related]",
+			"[class*=similar]",
+			"[class*=sidebar]",
+			"[class*=advert]",
+			"[class*=banner]",
+			"[class*=category]",
+			"[class*=breadcrumb]",
+			"[class*=tag]",
+			"[class*=label]",
+			"[id*=yandex]",
+			"[class*=yandex]",
+			"[href*=yandex]",
+			"[src*=yandex]",
+			"[data-ad-id]",
+			"[data-name=adWrapper]"
+	);
+	private static final ScrapedAuthorDTO AUTHOR = new ScrapedAuthorDTO(
+			"oxu.az",
+			"oxu.az",
+			"Oxu.az",
+			OxuAzScraperSupport.BASE_URL,
+			null
 	);
 
 	private final BrowserSessionFactory browserSessionFactory;
@@ -73,7 +143,28 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 			BrowserPage page = session.newPage();
 			openSearchPage(page, keyword.trim());
 			List<OxuAzSearchResultCard> cards = collectSearchResultCards(page, context);
-			log.info("Finished oxu.az search collection: keyword={}, candidatesFound={}", keyword, cards.size());
+			OxuAzArticleCollectionResult result = collectArticles(page, cards, context);
+			log.info(
+					"Finished oxu.az scraping: keyword={}, candidatesFound={}, articlesOpened={}, "
+							+ "postsFound={}, emptyText={}, outOfRange={}, duplicates={}, errors={}",
+					keyword,
+					cards.size(),
+					result.articlesOpened(),
+					result.posts().size(),
+					result.skippedEmptyText(),
+					result.skippedOutOfRange(),
+					result.duplicates(),
+					result.skippedErrors()
+			);
+			if (!result.posts().isEmpty()) {
+				return ScraperExecutionResult.success(result.posts());
+			}
+			if (cards.isEmpty()) {
+				return ScraperExecutionResult.empty();
+			}
+			if (result.hasExtractionFailures()) {
+				return result.toFailedScraperResult(cards.size());
+			}
 			return ScraperExecutionResult.empty();
 		} catch (BrowserEngineException exception) {
 			log.warn("oxu.az scraping failed: {}", exception.getMessage());
@@ -238,6 +329,335 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 		));
 	}
 
+	private OxuAzArticleCollectionResult collectArticles(
+			BrowserPage page,
+			List<OxuAzSearchResultCard> cards,
+			ScraperExecutionContext context
+	) {
+		List<ScrapedPostDTO> posts = new ArrayList<>();
+		Set<String> seenExternalIds = new LinkedHashSet<>();
+		Set<String> seenPostUrls = new LinkedHashSet<>();
+		int articlesOpened = 0;
+		int skippedEmptyText = 0;
+		int skippedOutOfRange = 0;
+		int skippedErrors = 0;
+		int duplicates = 0;
+
+		for (OxuAzSearchResultCard card : cards) {
+			if (posts.size() >= context.maxPosts()) {
+				break;
+			}
+			articlesOpened++;
+			try {
+				ArticleCollectionAttempt attempt = collectArticleWithRetry(page, card, context);
+				if (attempt.post() == null) {
+					if (attempt.skipReason() == ArticleSkipReason.EMPTY_TEXT) {
+						skippedEmptyText++;
+					} else if (attempt.skipReason() == ArticleSkipReason.OUT_OF_RANGE) {
+						skippedOutOfRange++;
+					}
+					continue;
+				}
+				ScrapedPostDTO post = attempt.post();
+				if (seenExternalIds.add(post.externalPostId()) && seenPostUrls.add(post.postUrl())) {
+					posts.add(post);
+				} else {
+					duplicates++;
+					log.debug("Skipping duplicate oxu.az article: url={}, externalPostId={}", post.postUrl(), post.externalPostId());
+				}
+			} catch (RuntimeException exception) {
+				skippedErrors++;
+				log.warn("Skipping oxu.az article after parse failure: url={}, error={}", card.postUrl(), exception.getMessage());
+			}
+		}
+		return new OxuAzArticleCollectionResult(
+				posts,
+				articlesOpened,
+				skippedEmptyText,
+				skippedOutOfRange,
+				skippedErrors,
+				duplicates
+		);
+	}
+
+	private ArticleCollectionAttempt collectArticleWithRetry(
+			BrowserPage page,
+			OxuAzSearchResultCard card,
+			ScraperExecutionContext context
+	) {
+		try {
+			return collectArticle(page, card, context);
+		} catch (BrowserTimeoutException exception) {
+			log.warn("Timeout opening oxu.az article, retrying once: url={}", card.postUrl());
+			return collectArticle(page, card, context);
+		}
+	}
+
+	private ArticleCollectionAttempt collectArticle(
+			BrowserPage page,
+			OxuAzSearchResultCard card,
+			ScraperExecutionContext context
+	) {
+		page.navigate(card.postUrl());
+		page.waitForTimeout(500);
+		Document document = Jsoup.parse(page.content(), card.postUrl());
+		OffsetDateTime postDate = parseArticleDate(document).orElse(card.postDate());
+		if (!DateRangeValidator.isInsideRange(postDate, context.dateFrom(), context.dateTo())) {
+			log.debug("Skipping oxu.az article outside date range: url={}, postDate={}", card.postUrl(), postDate);
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.OUT_OF_RANGE);
+		}
+
+		String text = extractArticleText(document, card);
+		if (text == null || text.isBlank()) {
+			log.warn(
+					"Skipping oxu.az article with empty text: url={}, title={}, selectorsTried={}",
+					card.postUrl(),
+					card.title(),
+					List.of(ARTICLE_ROOT_SELECTORS)
+			);
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.EMPTY_TEXT);
+		}
+
+		String externalPostId = OxuAzScraperSupport.extractExternalPostId(card.postUrl())
+				.orElseGet(() -> Integer.toHexString(card.postUrl().hashCode()));
+		List<ScrapedMediaDTO> media = extractMedia(document, card);
+		Map<String, Object> metadata = metadata(context, card);
+
+		log.info("Collected oxu.az article: url={}, mediaCount={}", card.postUrl(), media.size());
+		return ArticleCollectionAttempt.collected(new ScrapedPostDTO(
+				externalPostId,
+				card.postUrl(),
+				postDate,
+				AUTHOR,
+				text,
+				"az",
+				media,
+				metadata
+		));
+	}
+
+	Optional<OffsetDateTime> parseArticleDate(Document document) {
+		Optional<String> metaDate = firstMetaContent(
+				document,
+				"meta[property=article:published_time]",
+				"meta[property=og:updated_time]",
+				"meta[name=date]"
+		);
+		if (metaDate.isPresent()) {
+			Optional<OffsetDateTime> parsedMetaDate = parseOffsetDateTime(metaDate.get());
+			if (parsedMetaDate.isPresent()) {
+				return parsedMetaDate;
+			}
+			Optional<OffsetDateTime> parsedTextDate = dateParser.parseArticleDate(metaDate.get());
+			if (parsedTextDate.isPresent()) {
+				return parsedTextDate;
+			}
+		}
+
+		for (Element element : document.select(ARTICLE_DATE_SELECTOR)) {
+			String candidate = firstNonBlank(element.attr("datetime"), element.text());
+			if (candidate == null || !looksLikeDate(candidate)) {
+				continue;
+			}
+			Optional<OffsetDateTime> parsedOffsetDateTime = parseOffsetDateTime(candidate);
+			if (parsedOffsetDateTime.isPresent()) {
+				return parsedOffsetDateTime;
+			}
+			Optional<OffsetDateTime> parsedDate = dateParser.parseArticleDate(candidate);
+			if (parsedDate.isPresent()) {
+				return parsedDate;
+			}
+		}
+		return Optional.empty();
+	}
+
+	String extractArticleText(Document document, OxuAzSearchResultCard card) {
+		String bestText = null;
+		for (Element root : findArticleRoots(document)) {
+			String paragraphText = extractParagraphText(root);
+			if (isBetterArticleText(paragraphText, bestText)) {
+				bestText = paragraphText;
+				continue;
+			}
+			String rootText = extractRootText(root);
+			if (isBetterArticleText(rootText, bestText)) {
+				bestText = rootText;
+			}
+		}
+		if (isUsableArticleText(bestText)) {
+			return bestText;
+		}
+		Optional<String> metaDescription = firstMetaContent(
+				document,
+				"meta[name=description]",
+				"meta[property=description]",
+				"meta[property=og:description]"
+		).map(this::normalizeArticleText)
+				.filter(this::isUsableArticleText);
+		if (metaDescription.isPresent()) {
+			log.debug("Using oxu.az meta description fallback for article: url={}", card.postUrl());
+			return metaDescription.get();
+		}
+		return null;
+	}
+
+	private List<Element> findArticleRoots(Document document) {
+		List<Element> roots = new ArrayList<>();
+		Set<Element> seen = new LinkedHashSet<>();
+		for (String selector : ARTICLE_ROOT_SELECTORS) {
+			for (Element root : document.select(selector)) {
+				if (seen.add(root)) {
+					roots.add(root);
+				}
+			}
+		}
+		return roots;
+	}
+
+	private String extractParagraphText(Element root) {
+		Element cleanRoot = cleanedArticleContent(root);
+		List<String> paragraphs = cleanRoot
+				.select("p")
+				.stream()
+				.map(Element::text)
+				.map(this::normalizeArticleText)
+				.filter(this::isArticleParagraph)
+				.toList();
+		String text = String.join("\n", paragraphs);
+		return isUsableArticleText(text) ? text : null;
+	}
+
+	private String extractRootText(Element root) {
+		Element cleanElement = cleanedArticleContent(root);
+		String text = normalizeArticleText(cleanElement.text());
+		return isUsableArticleText(text) ? text : null;
+	}
+
+	private Element cleanedArticleContent(Element root) {
+		Element cleanRoot = root.clone();
+		cleanRoot.select(CLEANUP_SELECTOR).remove();
+		cleanRoot.select("*")
+				.stream()
+				.filter(this::isAdOnlyElement)
+				.toList()
+				.forEach(Element::remove);
+		return cleanRoot;
+	}
+
+	private boolean isAdOnlyElement(Element element) {
+		String text = normalizeArticleText(element.ownText());
+		return text != null && "ad".equalsIgnoreCase(text);
+	}
+
+	private boolean isArticleParagraph(String text) {
+		if (text == null || text.length() < MIN_PARAGRAPH_TEXT_LENGTH) {
+			return false;
+		}
+		String normalized = normalizeForNoiseChecks(text);
+		return !normalized.equals("dili secin")
+				&& !normalized.equals("son xeberler")
+				&& !normalized.equals("butun xeberler")
+				&& !normalized.equals("reklam")
+				&& !containsAdvertisingNoise(normalized);
+	}
+
+	private boolean containsAdvertisingNoise(String normalizedText) {
+		return normalizedText.contains("yandex")
+				|| normalizedText.contains("doubleclick")
+				|| normalizedText.contains("googleads")
+				|| normalizedText.contains("reklam")
+				|| normalizedText.contains("banner")
+				|| normalizedText.contains("advert");
+	}
+
+	private boolean isBetterArticleText(String candidate, String current) {
+		return isUsableArticleText(candidate) && (current == null || candidate.length() > current.length());
+	}
+
+	private boolean isUsableArticleText(String text) {
+		return text != null && text.length() >= MIN_ARTICLE_TEXT_LENGTH;
+	}
+
+	private String normalizeArticleText(String text) {
+		if (text == null) {
+			return null;
+		}
+		String normalized = text
+				.replace('\u00A0', ' ')
+				.replaceAll("[\\t\\x0B\\f\\r ]+", " ")
+				.replaceAll(" *\\n+ *", "\n")
+				.trim();
+		List<String> lines = normalized.lines()
+				.map(String::trim)
+				.filter(line -> !line.isBlank())
+				.toList();
+		return String.join("\n", lines);
+	}
+
+	List<ScrapedMediaDTO> extractMedia(Document document, OxuAzSearchResultCard card) {
+		Map<String, MediaType> mediaByUrl = new LinkedHashMap<>();
+		extractMainImageUrl(document, card.postUrl())
+				.ifPresent(mediaUrl -> mediaByUrl.put(mediaUrl, MediaType.IMAGE));
+		if (mediaByUrl.isEmpty() && card.thumbnailUrl() != null) {
+			mediaByUrl.put(card.thumbnailUrl(), MediaType.IMAGE);
+		}
+
+		List<ScrapedMediaDTO> media = new ArrayList<>();
+		int position = 0;
+		for (Map.Entry<String, MediaType> entry : mediaByUrl.entrySet()) {
+			media.add(new ScrapedMediaDTO(entry.getKey(), entry.getValue(), position++));
+		}
+		return media;
+	}
+
+	private Optional<String> extractMainImageUrl(Document document, String baseUrl) {
+		for (Element root : findArticleRoots(document)) {
+			Element cleanRoot = cleanedArticleContent(root);
+			Element image = cleanRoot.selectFirst("img[src], img[data-src], img[srcset], img[data-srcset]");
+			if (image == null) {
+				continue;
+			}
+			String rawUrl = firstNonBlank(
+					image.attr("src"),
+					image.attr("data-src"),
+					firstSrcsetUrl(image.attr("srcset")),
+					firstSrcsetUrl(image.attr("data-srcset"))
+			);
+			if (rawUrl == null || !OxuAzScraperSupport.isAllowedMediaUrl(rawUrl)) {
+				continue;
+			}
+			String normalizedUrl = UrlNormalizer.resolve(baseUrl, rawUrl);
+			if (OxuAzScraperSupport.isAllowedMediaUrl(normalizedUrl)) {
+				return Optional.of(normalizedUrl);
+			}
+		}
+		return Optional.empty();
+	}
+
+	private String firstSrcsetUrl(String srcset) {
+		if (srcset == null || srcset.isBlank()) {
+			return null;
+		}
+		String firstCandidate = srcset.split(",")[0].trim();
+		if (firstCandidate.isBlank()) {
+			return null;
+		}
+		return firstCandidate.split("\\s+")[0].trim();
+	}
+
+	private Map<String, Object> metadata(ScraperExecutionContext context, OxuAzSearchResultCard card) {
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("source", OxuAzScraperSupport.SOURCE_CODE);
+		metadata.put("keyword", context.keyword().getWord());
+		if (card.title() != null && !card.title().isBlank()) {
+			metadata.put("title", card.title());
+		}
+		if (card.thumbnailUrl() != null && !card.thumbnailUrl().isBlank()) {
+			metadata.put("thumbnailUrl", card.thumbnailUrl());
+		}
+		return metadata;
+	}
+
 	private boolean hasResultUrl(Element element) {
 		return firstNonBlank(
 				element.attr("data-url"),
@@ -263,6 +683,106 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 			}
 		}
 		return null;
+	}
+
+	private Optional<String> firstMetaContent(Document document, String... selectors) {
+		for (String selector : selectors) {
+			Element element = document.selectFirst(selector);
+			if (element == null) {
+				continue;
+			}
+			String content = firstNonBlank(element.attr("content"));
+			if (content != null) {
+				return Optional.of(content);
+			}
+		}
+		return Optional.empty();
+	}
+
+	private Optional<OffsetDateTime> parseOffsetDateTime(String value) {
+		try {
+			return Optional.of(OffsetDateTime.parse(value.trim()));
+		} catch (RuntimeException exception) {
+			return Optional.empty();
+		}
+	}
+
+	private boolean looksLikeDate(String value) {
+		String normalized = normalizeForNoiseChecks(value);
+		return normalized.matches(".*\\d{1,2}:\\d{2}.*")
+				|| normalized.matches(".*\\d{4}-\\d{2}-\\d{2}.*")
+				|| normalized.contains("bugun")
+				|| normalized.contains("bu gun")
+				|| normalized.contains("dunen");
+	}
+
+	private String normalizeForNoiseChecks(String value) {
+		return value.toLowerCase(Locale.ROOT)
+				.replace("ü", "u")
+				.replace("ə", "e")
+				.replace("ı", "i")
+				.replace("ğ", "g")
+				.replace("ş", "s")
+				.replace("ç", "c")
+				.replace("ö", "o")
+				.replace("Ã¼", "u")
+				.replace("É™", "e");
+	}
+
+	private enum ArticleSkipReason {
+		EMPTY_TEXT,
+		OUT_OF_RANGE
+	}
+
+	private record ArticleCollectionAttempt(
+			ScrapedPostDTO post,
+			ArticleSkipReason skipReason
+	) {
+
+		private static ArticleCollectionAttempt collected(ScrapedPostDTO post) {
+			return new ArticleCollectionAttempt(post, null);
+		}
+
+		private static ArticleCollectionAttempt skipped(ArticleSkipReason reason) {
+			return new ArticleCollectionAttempt(null, reason);
+		}
+	}
+
+	private record OxuAzArticleCollectionResult(
+			List<ScrapedPostDTO> posts,
+			int articlesOpened,
+			int skippedEmptyText,
+			int skippedOutOfRange,
+			int skippedErrors,
+			int duplicates
+	) {
+
+		private boolean hasExtractionFailures() {
+			return skippedEmptyText > 0 || skippedErrors > 0;
+		}
+
+		private ScraperExecutionResult toFailedScraperResult(int candidatesFound) {
+			String message = ("oxu.az extraction failed: candidatesFound=%d, articlesOpened=%d, "
+					+ "articlesSkippedEmptyText=%d, articlesSkippedOutOfRange=%d, "
+					+ "articlesSkippedErrors=%d, duplicateArticles=%d, postsCollected=0")
+					.formatted(
+							candidatesFound,
+							articlesOpened,
+							skippedEmptyText,
+							skippedOutOfRange,
+							skippedErrors,
+							duplicates
+					);
+			return new ScraperExecutionResult(
+					ScraperExecutionStatus.FAILED,
+					List.of(),
+					0,
+					articlesOpened,
+					message,
+					null,
+					null
+			);
+		}
 	}
 
 	private record CardCollectionStats(
