@@ -2,6 +2,8 @@ package org.raul.javawebscarper.orchestrator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.raul.javawebscarper.config.DailyScrapingProperties;
 import org.raul.javawebscarper.config.ScrapeSchedulerProperties;
 import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
@@ -32,6 +34,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -132,6 +135,13 @@ class ScrapeJobOrchestratorTests {
 		assertThat(response.jobsFailed()).isZero();
 		assertThat(response.jobsSkipped()).isZero();
 		verify(scrapeJobService).markSuccess(job.getId(), 0, 0);
+		verify(scrapeJobService, never()).hasJobForRunType(
+				source,
+				keyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		);
 	}
 
 	@Test
@@ -217,6 +227,7 @@ class ScrapeJobOrchestratorTests {
 				.keyword(keyword)
 				.dateFrom(DATE_FROM)
 				.dateTo(DAILY_DATE_TO)
+				.runType(ScrapeJobRunType.DAILY_PREVIOUS_DAY)
 				.status(ScrapeJobStatus.PENDING)
 				.build();
 		ScraperResult scraperResult = new ScraperResult(
@@ -255,5 +266,91 @@ class ScrapeJobOrchestratorTests {
 		assertThat(response.postsFound()).isEqualTo(3);
 		assertThat(response.postsSaved()).isEqualTo(2);
 		verify(scrapeJobService).markSuccess(dailyJob.getId(), 3, 2);
+	}
+
+	@Test
+	void secondDailyPreviousDayRunSkipsExistingJobs() {
+		ScrapeJob dailyJob = ScrapeJob.builder()
+				.id(UUID.randomUUID())
+				.source(source)
+				.keyword(keyword)
+				.dateFrom(DATE_FROM)
+				.dateTo(DAILY_DATE_TO)
+				.runType(ScrapeJobRunType.DAILY_PREVIOUS_DAY)
+				.status(ScrapeJobStatus.PENDING)
+				.build();
+		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
+		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
+		when(scrapeJobService.hasJobForRunType(
+				source,
+				keyword,
+				DATE_FROM,
+				DAILY_DATE_TO,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY
+		)).thenReturn(false, true);
+		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DAILY_DATE_TO)).thenReturn(false);
+		when(scrapeJobService.createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DAILY_DATE_TO,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY
+		)).thenReturn(dailyJob);
+		when(scrapeJobService.markRunning(dailyJob.getId())).thenReturn(dailyJob);
+		when(scraperRunner.run(dailyJob)).thenReturn(ScraperResult.empty());
+
+		DailyScrapeRunResponseDTO firstRun = orchestrator.createAndRunDailyPreviousDayJobs();
+		DailyScrapeRunResponseDTO secondRun = orchestrator.createAndRunDailyPreviousDayJobs();
+
+		assertThat(firstRun.jobsCreated()).isEqualTo(1);
+		assertThat(firstRun.jobsSkipped()).isZero();
+		assertThat(secondRun.jobsCreated()).isZero();
+		assertThat(secondRun.jobsSucceeded()).isZero();
+		assertThat(secondRun.jobsSkipped()).isEqualTo(1);
+		verify(scrapeJobService, times(1)).createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DAILY_DATE_TO,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY
+		);
+	}
+
+	@ParameterizedTest
+	@EnumSource(ScrapeJobStatus.class)
+	void existingDailyPreviousDayJobBlocksNewJobForAnyStatus(ScrapeJobStatus existingStatus) {
+		ScrapeJob existingJob = ScrapeJob.builder()
+				.id(UUID.randomUUID())
+				.source(source)
+				.keyword(keyword)
+				.dateFrom(DATE_FROM)
+				.dateTo(DAILY_DATE_TO)
+				.runType(ScrapeJobRunType.DAILY_PREVIOUS_DAY)
+				.status(existingStatus)
+				.build();
+		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
+		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
+		when(scrapeJobService.hasJobForRunType(
+				existingJob.getSource(),
+				existingJob.getKeyword(),
+				existingJob.getDateFrom(),
+				existingJob.getDateTo(),
+				existingJob.getRunType()
+		)).thenReturn(true);
+
+		DailyScrapeRunResponseDTO response = orchestrator.createAndRunDailyPreviousDayJobs();
+
+		assertThat(response.jobsCreated()).isZero();
+		assertThat(response.jobsSucceeded()).isZero();
+		assertThat(response.jobsFailed()).isZero();
+		assertThat(response.jobsSkipped()).isEqualTo(1);
+		verify(scrapeJobService, never()).hasActiveJob(source, keyword, DATE_FROM, DAILY_DATE_TO);
+		verify(scrapeJobService, never()).createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DAILY_DATE_TO,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY
+		);
 	}
 }
