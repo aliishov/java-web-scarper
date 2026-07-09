@@ -38,12 +38,14 @@ public class ScrapeJobService {
 	private final ScrapeJobRepository scrapeJobRepository;
 	private final SourceService sourceService;
 	private final KeywordService keywordService;
+	private final SourceLanguageSupportService sourceLanguageSupportService;
 
 	@Transactional
 	public ScrapeJobResponseDTO create(CreateScrapeJobRequestDTO request) {
 		validateDateRange(request.dateFrom(), request.dateTo());
 		Source source = sourceService.getEntity(request.sourceId());
 		Keyword keyword = keywordService.getEntity(request.keywordId());
+		sourceLanguageSupportService.validateSupported(source, keyword);
 		ScrapeJob scrapeJob = ScrapeJobMapper.toEntity(request, source, keyword);
 		return ScrapeJobMapper.toResponse(scrapeJobRepository.save(scrapeJob));
 	}
