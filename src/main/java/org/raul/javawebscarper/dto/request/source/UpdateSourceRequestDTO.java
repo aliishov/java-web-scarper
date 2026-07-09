@@ -4,7 +4,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.hibernate.validator.constraints.URL;
+import org.raul.javawebscarper.model.enumerated.Language;
 import org.raul.javawebscarper.model.enumerated.SourceType;
+
+import java.util.Set;
 
 public record UpdateSourceRequestDTO(
 		@NotBlank
@@ -21,6 +24,8 @@ public record UpdateSourceRequestDTO(
 		@NotBlank
 		@URL
 		String baseUrl,
+
+		Set<Language> supportedLanguages,
 
 		Boolean enabled
 ) {

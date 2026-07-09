@@ -11,6 +11,7 @@ import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponse
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.Language;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 import org.raul.javawebscarper.scheduler.PreviousDayDateRangeResolver;
@@ -18,6 +19,7 @@ import org.raul.javawebscarper.scraper.ScraperResult;
 import org.raul.javawebscarper.scraper.ScraperRunner;
 import org.raul.javawebscarper.service.KeywordService;
 import org.raul.javawebscarper.service.ScrapeJobService;
+import org.raul.javawebscarper.service.SourceLanguageSupportService;
 import org.raul.javawebscarper.service.SourceService;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -29,6 +31,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -87,7 +90,8 @@ class ScrapeJobOrchestratorTests {
 				properties,
 				FIXED_CLOCK,
 				dailyProperties,
-				new PreviousDayDateRangeResolver()
+				new PreviousDayDateRangeResolver(),
+				new SourceLanguageSupportService()
 		);
 
 		source = Source.builder()
@@ -217,6 +221,134 @@ class ScrapeJobOrchestratorTests {
 		verify(scrapeJobService, never()).hasActiveJob(source, secondKeyword, DATE_FROM, DATE_TO);
 		verify(scraperRunner).run(job);
 		verifyNoMoreInteractions(scraperRunner);
+	}
+
+	@Test
+	void bakuWsAzKeywordCreatesJob() {
+		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
+		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
+		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DATE_TO)).thenReturn(false);
+		when(scrapeJobService.createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		)).thenReturn(job);
+		when(scrapeJobService.markRunning(job.getId())).thenReturn(job);
+		when(scraperRunner.run(job)).thenReturn(ScraperResult.empty());
+
+		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
+
+		assertThat(response.jobsCreated()).isEqualTo(1);
+		assertThat(response.jobsSkipped()).isZero();
+		verify(scrapeJobService).createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		);
+	}
+
+	@Test
+	void bakuWsRuKeywordIsSkipped() {
+		Keyword ruKeyword = Keyword.builder()
+				.id(2)
+				.word("sud")
+				.language(Language.RU)
+				.enabled(true)
+				.build();
+		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
+		when(keywordService.findEnabledEntities()).thenReturn(List.of(ruKeyword));
+
+		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
+
+		assertThat(response.jobsCreated()).isZero();
+		assertThat(response.jobsSkipped()).isEqualTo(1);
+		verify(scrapeJobService, never()).hasActiveJob(source, ruKeyword, DATE_FROM, DATE_TO);
+		verify(scrapeJobService, never()).createPendingJob(
+				source,
+				ruKeyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		);
+	}
+
+	@Test
+	void mediaAzRuKeywordCreatesJob() {
+		Source mediaAz = Source.builder()
+				.id(2)
+				.code("media_az")
+				.name("Media.az")
+				.supportedLanguages(EnumSet.of(Language.RU))
+				.enabled(true)
+				.build();
+		Keyword ruKeyword = Keyword.builder()
+				.id(2)
+				.word("sud")
+				.language(Language.RU)
+				.enabled(true)
+				.build();
+		ScrapeJob mediaJob = ScrapeJob.builder()
+				.id(UUID.randomUUID())
+				.source(mediaAz)
+				.keyword(ruKeyword)
+				.dateFrom(DATE_FROM)
+				.dateTo(DATE_TO)
+				.status(ScrapeJobStatus.PENDING)
+				.build();
+		when(sourceService.findEnabledEntities()).thenReturn(List.of(mediaAz));
+		when(keywordService.findEnabledEntities()).thenReturn(List.of(ruKeyword));
+		when(scrapeJobService.hasActiveJob(mediaAz, ruKeyword, DATE_FROM, DATE_TO)).thenReturn(false);
+		when(scrapeJobService.createPendingJob(
+				mediaAz,
+				ruKeyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		)).thenReturn(mediaJob);
+		when(scrapeJobService.markRunning(mediaJob.getId())).thenReturn(mediaJob);
+		when(scraperRunner.run(mediaJob)).thenReturn(ScraperResult.empty());
+
+		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
+
+		assertThat(response.jobsCreated()).isEqualTo(1);
+		assertThat(response.jobsSkipped()).isZero();
+		verify(scrapeJobService).createPendingJob(
+				mediaAz,
+				ruKeyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		);
+	}
+
+	@Test
+	void mediaAzAzKeywordIsSkipped() {
+		Source mediaAz = Source.builder()
+				.id(2)
+				.code("media_az")
+				.name("Media.az")
+				.supportedLanguages(EnumSet.of(Language.RU))
+				.enabled(true)
+				.build();
+		when(sourceService.findEnabledEntities()).thenReturn(List.of(mediaAz));
+		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
+
+		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
+
+		assertThat(response.jobsCreated()).isZero();
+		assertThat(response.jobsSkipped()).isEqualTo(1);
+		verify(scrapeJobService, never()).hasActiveJob(mediaAz, keyword, DATE_FROM, DATE_TO);
+		verify(scrapeJobService, never()).createPendingJob(
+				mediaAz,
+				keyword,
+				DATE_FROM,
+				DATE_TO,
+				ScrapeJobRunType.SCHEDULED
+		);
 	}
 
 	@Test
