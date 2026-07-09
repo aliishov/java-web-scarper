@@ -5,6 +5,7 @@ import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 
 public final class ScrapeJobMapper {
@@ -18,6 +19,7 @@ public final class ScrapeJobMapper {
 				.keyword(keyword)
 				.dateFrom(request.dateFrom())
 				.dateTo(request.dateTo())
+				.runType(request.runType() == null ? ScrapeJobRunType.MANUAL : request.runType())
 				.status(ScrapeJobStatus.PENDING)
 				.postsFound(0)
 				.postsSaved(0)
@@ -33,6 +35,7 @@ public final class ScrapeJobMapper {
 				scrapeJob.getKeyword().getWord(),
 				scrapeJob.getDateFrom(),
 				scrapeJob.getDateTo(),
+				scrapeJob.getRunType(),
 				scrapeJob.getStatus(),
 				scrapeJob.getStartedAt(),
 				scrapeJob.getFinishedAt(),

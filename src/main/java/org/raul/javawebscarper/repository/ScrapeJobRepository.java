@@ -3,6 +3,7 @@ package org.raul.javawebscarper.repository;
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +43,14 @@ public interface ScrapeJobRepository extends JpaRepository<ScrapeJob, UUID>, Jpa
 			LocalDate dateFrom,
 			LocalDate dateTo,
 			Collection<ScrapeJobStatus> statuses
+	);
+
+	boolean existsBySourceAndKeywordAndDateFromAndDateToAndRunType(
+			Source source,
+			Keyword keyword,
+			LocalDate dateFrom,
+			LocalDate dateTo,
+			ScrapeJobRunType runType
 	);
 
 	@EntityGraph(attributePaths = {"source", "keyword"})

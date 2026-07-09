@@ -12,6 +12,7 @@ import org.raul.javawebscarper.mapper.ScrapeJobMapper;
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 import org.raul.javawebscarper.repository.ScrapeJobRepository;
 import org.springframework.data.domain.Pageable;
@@ -49,12 +50,24 @@ public class ScrapeJobService {
 
 	@Transactional
 	public ScrapeJob createPendingJob(Source source, Keyword keyword, LocalDate dateFrom, LocalDate dateTo) {
+		return createPendingJob(source, keyword, dateFrom, dateTo, ScrapeJobRunType.SCHEDULED);
+	}
+
+	@Transactional
+	public ScrapeJob createPendingJob(
+			Source source,
+			Keyword keyword,
+			LocalDate dateFrom,
+			LocalDate dateTo,
+			ScrapeJobRunType runType
+	) {
 		validateDateRange(dateFrom, dateTo);
 		ScrapeJob scrapeJob = ScrapeJob.builder()
 				.source(source)
 				.keyword(keyword)
 				.dateFrom(dateFrom)
 				.dateTo(dateTo)
+				.runType(runType == null ? ScrapeJobRunType.SCHEDULED : runType)
 				.status(ScrapeJobStatus.PENDING)
 				.postsFound(0)
 				.postsSaved(0)
@@ -100,6 +113,23 @@ public class ScrapeJobService {
 				dateFrom,
 				dateTo,
 				ACTIVE_JOB_STATUSES
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public boolean hasJobForRunType(
+			Source source,
+			Keyword keyword,
+			LocalDate dateFrom,
+			LocalDate dateTo,
+			ScrapeJobRunType runType
+	) {
+		return scrapeJobRepository.existsBySourceAndKeywordAndDateFromAndDateToAndRunType(
+				source,
+				keyword,
+				dateFrom,
+				dateTo,
+				runType
 		);
 	}
 
