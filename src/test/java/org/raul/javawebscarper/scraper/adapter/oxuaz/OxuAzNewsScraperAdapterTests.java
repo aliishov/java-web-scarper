@@ -121,6 +121,30 @@ class OxuAzNewsScraperAdapterTests {
 	}
 
 	@Test
+	void removesSocialShareParagraphsFromArticleText() {
+		Document document = Jsoup.parse("""
+				<html>
+				  <body>
+				    <article>
+				      <div class="news-inner__desc">
+				        <p>The article paragraph has enough useful text to be accepted by the extractor.</p>
+				        <p>X\u0259b\u0259r maraql\u0131 g\u0259lib? Sosial \u015f\u0259b\u0259k\u0259l\u0259rd\u0259 payla\u015f\u0131n</p>
+				        <p>\u018fn son x\u0259b\u0259rl\u0259ri bizim Telegram kanal\u0131m\u0131zda izl\u0259yin</p>
+				      </div>
+				    </article>
+				  </body>
+				</html>
+				""", "https://oxu.az/cemiyyet/example");
+
+		String text = adapter.extractArticleText(document, articleCard());
+
+		assertThat(text)
+				.contains("The article paragraph has enough useful text")
+				.doesNotContain("Sosial")
+				.doesNotContain("Telegram");
+	}
+
+	@Test
 	void fallsBackToMetaDescriptionWhenArticleBodyIsMissing() {
 		Document document = Jsoup.parse("""
 				<html>
@@ -182,6 +206,34 @@ class OxuAzNewsScraperAdapterTests {
 		assertThat(media)
 				.extracting(ScrapedMediaDTO::mediaType)
 				.containsExactly(MediaType.IMAGE);
+	}
+
+	@Test
+	void prefersMetaImageAndIgnoresBrandAssets() {
+		Document document = Jsoup.parse("""
+				<html>
+				  <head>
+				    <meta property="og:image" content="https://images.oxu.az/users/article-main:250.jpg">
+				  </head>
+				  <body>
+				    <article>
+				      <div class="news-inner__image">
+				        <img src="https://oxu.az/assets/img/brands/mokaland.webp">
+				        <img src="https://oxu.az/media/img/thunk_300.svg">
+				      </div>
+				      <div class="news-inner__desc">
+				        <p>The article text is intentionally long enough for the fixture.</p>
+				      </div>
+				    </article>
+				  </body>
+				</html>
+				""", "https://oxu.az/cemiyyet/example");
+
+		List<ScrapedMediaDTO> media = adapter.extractMedia(document, articleCard());
+
+		assertThat(media)
+				.extracting(ScrapedMediaDTO::mediaUrl)
+				.containsExactly("https://images.oxu.az/users/article-main:250.jpg");
 	}
 
 	@Test

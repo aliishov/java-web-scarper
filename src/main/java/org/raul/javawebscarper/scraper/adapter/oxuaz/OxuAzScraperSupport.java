@@ -59,6 +59,11 @@ public final class OxuAzScraperSupport {
 				&& !normalized.contains("banner")
 				&& !normalized.contains("placeholder")
 				&& !normalized.contains("sprite")
+				&& !normalized.contains("/assets/")
+				&& !normalized.contains("/brands/")
+				&& !normalized.contains("thunk_")
+				&& !normalized.contains("mokaland")
+				&& !normalized.endsWith(".svg")
 				&& !normalized.contains("logo")
 				&& !normalized.contains("icon");
 	}

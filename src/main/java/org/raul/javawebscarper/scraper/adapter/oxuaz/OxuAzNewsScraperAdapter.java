@@ -63,14 +63,14 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 	private static final String[] ARTICLE_ROOT_SELECTORS = {
 			"article .post-detail-content",
 			"article .news-inner__desc",
+			"article [class*='content']",
+			"article [class*='detail']",
 			".post-detail-content",
 			".news-inner__desc",
 			"[class*='detail'] [class*='content']",
 			"main article",
 			"article",
-			".rt-news-item[data-url]",
-			"[class*='detail']",
-			"[class*='content']"
+			".rt-news-item[data-url]"
 	};
 	private static final String CLEANUP_SELECTOR = String.join(", ",
 			"script",
@@ -479,11 +479,6 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 				if (isBetterArticleText(paragraphText, bestText)) {
 					bestText = paragraphText;
 				}
-				continue;
-			}
-			String rootText = extractRootText(root);
-			if (isBetterArticleText(rootText, bestText)) {
-				bestText = rootText;
 			}
 		}
 		if (isUsableArticleText(bestText)) {
@@ -529,12 +524,6 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 		return isUsableArticleText(text) ? text : null;
 	}
 
-	private String extractRootText(Element root) {
-		Element cleanElement = cleanedArticleContent(root);
-		String text = normalizeArticleText(cleanElement.text());
-		return isUsableArticleText(text) ? text : null;
-	}
-
 	private Element cleanedArticleContent(Element root) {
 		Element cleanRoot = root.clone();
 		cleanRoot.select(CLEANUP_SELECTOR).remove();
@@ -569,7 +558,12 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 				|| normalizedText.contains("googleads")
 				|| normalizedText.contains("reklam")
 				|| normalizedText.contains("banner")
-				|| normalizedText.contains("advert");
+				|| normalizedText.contains("advert")
+				|| normalizedText.contains("sosial sebekelerde paylasin")
+				|| normalizedText.contains("en son xeberleri bizim")
+				|| normalizedText.contains("whatsapp kanali")
+				|| normalizedText.contains("telegram kanali")
+				|| normalizedText.contains("facebook sehifemizde");
 	}
 
 	private boolean isBetterArticleText(String candidate, String current) {
@@ -598,7 +592,8 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 
 	List<ScrapedMediaDTO> extractMedia(Document document, OxuAzSearchResultCard card) {
 		Map<String, MediaType> mediaByUrl = new LinkedHashMap<>();
-		extractMainImageUrl(document, card.postUrl())
+		extractMetaImageUrl(document, card.postUrl())
+				.or(() -> extractMainImageUrl(document, card.postUrl()))
 				.ifPresent(mediaUrl -> mediaByUrl.put(mediaUrl, MediaType.IMAGE));
 		if (mediaByUrl.isEmpty() && card.thumbnailUrl() != null) {
 			mediaByUrl.put(card.thumbnailUrl(), MediaType.IMAGE);
@@ -610,6 +605,15 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 			media.add(new ScrapedMediaDTO(entry.getKey(), entry.getValue(), position++));
 		}
 		return media;
+	}
+
+	private Optional<String> extractMetaImageUrl(Document document, String baseUrl) {
+		return firstMetaContent(
+				document,
+				"meta[property=og:image]",
+				"meta[name=twitter:image]"
+		).map(rawUrl -> UrlNormalizer.resolve(baseUrl, rawUrl))
+				.filter(OxuAzScraperSupport::isAllowedMediaUrl);
 	}
 
 	private Optional<String> extractMainImageUrl(Document document, String baseUrl) {
