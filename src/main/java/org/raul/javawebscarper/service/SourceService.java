@@ -10,6 +10,7 @@ import org.raul.javawebscarper.exception.DuplicateResourceException;
 import org.raul.javawebscarper.exception.ResourceNotFoundException;
 import org.raul.javawebscarper.mapper.SourceMapper;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.Language;
 import org.raul.javawebscarper.repository.AuthorRepository;
 import org.raul.javawebscarper.repository.PostRepository;
 import org.raul.javawebscarper.repository.ScrapeJobRepository;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +38,7 @@ public class SourceService {
 			throw new DuplicateResourceException("Source with code '%s' already exists".formatted(code));
 		}
 		Source source = SourceMapper.toEntity(request);
+		validateSupportedLanguages(source.isEnabled(), source.getSupportedLanguages());
 		return SourceMapper.toResponse(sourceRepository.save(source));
 	}
 
@@ -62,12 +65,14 @@ public class SourceService {
 			throw new DuplicateResourceException("Source with code '%s' already exists".formatted(code));
 		}
 		SourceMapper.updateEntity(source, request);
+		validateSupportedLanguages(source.isEnabled(), source.getSupportedLanguages());
 		return SourceMapper.toResponse(source);
 	}
 
 	@Transactional
 	public SourceResponseDTO enable(Integer id) {
 		Source source = getEntity(id);
+		validateSupportedLanguages(true, source.getSupportedLanguages());
 		source.setEnabled(true);
 		return SourceMapper.toResponse(source);
 	}
@@ -98,5 +103,11 @@ public class SourceService {
 
 	private String normalize(String value) {
 		return value.trim().toLowerCase();
+	}
+
+	private void validateSupportedLanguages(boolean enabled, Set<Language> supportedLanguages) {
+		if (enabled && (supportedLanguages == null || supportedLanguages.isEmpty())) {
+			throw new BadRequestException("Enabled source must support at least one language");
+		}
 	}
 }

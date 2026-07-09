@@ -1,13 +1,17 @@
 package org.raul.javawebscarper.model;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -23,7 +27,11 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
+import org.raul.javawebscarper.model.enumerated.Language;
 import org.raul.javawebscarper.model.enumerated.SourceType;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 @Entity
 @Table(
@@ -66,7 +74,25 @@ public class Source extends BaseEntity {
 	@Column(name = "base_url", nullable = false, columnDefinition = "TEXT")
 	String baseUrl;
 
+	@ElementCollection(fetch = FetchType.LAZY)
+	@CollectionTable(
+			name = "source_supported_languages",
+			schema = "core",
+			joinColumns = @JoinColumn(name = "source_id", nullable = false),
+			indexes = {
+					@Index(name = "idx_source_supported_languages_language", columnList = "language")
+			}
+	)
+	@Enumerated(EnumType.STRING)
+	@Column(name = "language", nullable = false, length = 10)
+	@Builder.Default
+	Set<Language> supportedLanguages = EnumSet.of(Language.AZ);
+
 	@Column(name = "is_enabled", nullable = false)
 	@Builder.Default
 	boolean enabled = true;
+
+	public boolean supportsLanguage(Language language) {
+		return language != null && supportedLanguages != null && supportedLanguages.contains(language);
+	}
 }
