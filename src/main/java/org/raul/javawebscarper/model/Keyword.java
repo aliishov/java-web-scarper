@@ -2,6 +2,8 @@ package org.raul.javawebscarper.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -20,6 +22,7 @@ import lombok.experimental.FieldDefaults;
 
 import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
+import org.raul.javawebscarper.model.enumerated.Language;
 
 @Entity
 @Table(
@@ -29,7 +32,8 @@ import org.hibernate.annotations.DynamicUpdate;
 				@UniqueConstraint(name = "uq_keywords_word", columnNames = "word")
 		},
 		indexes = {
-				@Index(name = "idx_keywords_enabled", columnList = "is_enabled")
+				@Index(name = "idx_keywords_enabled", columnList = "is_enabled"),
+				@Index(name = "idx_keywords_language_enabled", columnList = "language,is_enabled")
 		}
 )
 @Getter
@@ -49,6 +53,11 @@ public class Keyword extends BaseEntity {
 
 	@Column(name = "word", nullable = false)
 	String word;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "language", nullable = false, length = 10)
+	@Builder.Default
+	Language language = Language.AZ;
 
 	@Column(name = "is_enabled", nullable = false)
 	@Builder.Default
