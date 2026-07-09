@@ -475,8 +475,10 @@ public class OxuAzNewsScraperAdapter implements NewsScraperAdapter {
 		String bestText = null;
 		for (Element root : findArticleRoots(document)) {
 			String paragraphText = extractParagraphText(root);
-			if (isBetterArticleText(paragraphText, bestText)) {
-				bestText = paragraphText;
+			if (isUsableArticleText(paragraphText)) {
+				if (isBetterArticleText(paragraphText, bestText)) {
+					bestText = paragraphText;
+				}
 				continue;
 			}
 			String rootText = extractRootText(root);
