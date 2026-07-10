@@ -64,4 +64,17 @@ public final class MediaAzScraperSupport {
 				&& !normalized.contains("logo")
 				&& !normalized.contains("icon");
 	}
+
+	public static boolean isLikelyAntiBotPage(String html) {
+		if (html == null || html.isBlank()) {
+			return false;
+		}
+		String normalized = html.toLowerCase(Locale.ROOT);
+		return normalized.contains("just a moment")
+				|| normalized.contains("cf-browser-verification")
+				|| normalized.contains("cf-chl")
+				|| normalized.contains("/cdn-cgi/challenge-platform/")
+				|| normalized.contains("challenges.cloudflare.com")
+				|| normalized.contains("checking if the site connection is secure");
+	}
 }

@@ -44,11 +44,9 @@ public class MediaAzNewsScraperAdapter implements NewsScraperAdapter {
 
 	private static final String SEARCH_TOGGLE_SELECTOR = "button.header__tool.header__search-open";
 	private static final String SEARCH_INPUT_SELECTOR = "form.header__search input[name='query']";
-	private static final String SEARCH_SUBMIT_SELECTOR = "form.header__search button[type='submit']";
 	private static final String RESULT_CARD_SELECTOR = "div.post-block[data-timestamp]";
 	private static final int MIN_ARTICLE_TEXT_LENGTH = 50;
 	private static final int MIN_PARAGRAPH_TEXT_LENGTH = 20;
-	private static final String ARTICLE_ROOT_SELECTOR = ".news-inner__body.rt-news-item";
 	private static final String ARTICLE_DATE_SELECTOR = ".news-inner__info li";
 	private static final String ARTICLE_TITLE_SELECTOR = ".news-inner__title";
 	private static final String ARTICLE_TEXT_SELECTOR = ".news-inner__desc";
@@ -124,6 +122,10 @@ public class MediaAzNewsScraperAdapter implements NewsScraperAdapter {
 		try (BrowserSession session = browserSessionFactory.createSession()) {
 			BrowserPage page = session.newPage();
 			openSearchPage(page, keyword.trim(), context);
+			Optional<ScraperExecutionResult> blockedResult = failIfAntiBotPage(page, "UI search");
+			if (blockedResult.isPresent()) {
+				return blockedResult.get();
+			}
 			List<MediaAzSearchResultCard> cards = collectSearchResultCards(page, context);
 			if (cards.isEmpty()) {
 				String fallbackUrl = datedSearchUrl(
@@ -136,6 +138,10 @@ public class MediaAzNewsScraperAdapter implements NewsScraperAdapter {
 				page.navigate(fallbackUrl);
 				page.waitForTimeout(1_000);
 				waitForSearchResults(page);
+				blockedResult = failIfAntiBotPage(page, "dated search fallback");
+				if (blockedResult.isPresent()) {
+					return blockedResult.get();
+				}
 				cards = collectSearchResultCards(page, context);
 			}
 			if (cards.isEmpty()) {
@@ -144,6 +150,10 @@ public class MediaAzNewsScraperAdapter implements NewsScraperAdapter {
 				page.navigate(broadFallbackUrl);
 				page.waitForTimeout(1_000);
 				waitForSearchResults(page);
+				blockedResult = failIfAntiBotPage(page, "broad search fallback");
+				if (blockedResult.isPresent()) {
+					return blockedResult.get();
+				}
 				cards = collectSearchResultCards(page, context);
 			}
 			MediaAzArticleCollectionResult result = collectArticles(page, cards, context);
@@ -208,6 +218,15 @@ public class MediaAzNewsScraperAdapter implements NewsScraperAdapter {
 			waitForSearchResults(page);
 		}
 		log.info("media.az search page opened: {}", page.url());
+	}
+
+	private Optional<ScraperExecutionResult> failIfAntiBotPage(BrowserPage page, String step) {
+		if (!MediaAzScraperSupport.isLikelyAntiBotPage(page.content())) {
+			return Optional.empty();
+		}
+		String message = "media.az anti-bot challenge detected during " + step;
+		log.warn("{}: url={}", message, page.url());
+		return Optional.of(ScraperExecutionResult.failed(message));
 	}
 
 	private void waitForSearchResults(BrowserPage page) {
