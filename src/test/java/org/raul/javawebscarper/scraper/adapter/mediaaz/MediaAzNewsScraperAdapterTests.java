@@ -214,6 +214,35 @@ class MediaAzNewsScraperAdapterTests {
 				.containsExactly(MediaType.IMAGE);
 	}
 
+	@Test
+	void detectsCloudflareChallengePage() {
+		String html = """
+				<html>
+				  <head><title>Just a moment...</title></head>
+				  <body>
+				    <script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1"></script>
+				  </body>
+				</html>
+				""";
+
+		assertThat(MediaAzScraperSupport.isLikelyAntiBotPage(html)).isTrue();
+	}
+
+	@Test
+	void doesNotTreatNormalMediaAzPageAsAntiBotChallenge() {
+		String html = """
+				<html>
+				  <body>
+				    <div class="post-block" data-timestamp="2026-06-25 12:40:00">
+				      <a class="news__item" href="https://media.az/politika/example">Example</a>
+				    </div>
+				  </body>
+				</html>
+				""";
+
+		assertThat(MediaAzScraperSupport.isLikelyAntiBotPage(html)).isFalse();
+	}
+
 	private MediaAzSearchResultCard articleCard() {
 		return new MediaAzSearchResultCard(
 				"https://media.az/politika/example",
