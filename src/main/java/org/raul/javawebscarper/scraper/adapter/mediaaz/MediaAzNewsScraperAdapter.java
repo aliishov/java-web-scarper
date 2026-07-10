@@ -198,9 +198,7 @@ public class MediaAzNewsScraperAdapter implements NewsScraperAdapter {
 				page.waitForTimeout(1_000);
 				waitForSearchResults(page);
 			} else {
-				log.info("media.az UI search opened, applying dated fallback URL: {}", fallbackUrl);
-				page.navigate(fallbackUrl);
-				page.waitForTimeout(1_000);
+				log.info("media.az UI search page opened, collecting UI results before dated fallbacks");
 				waitForSearchResults(page);
 			}
 		} catch (BrowserEngineException exception) {
