@@ -56,6 +56,20 @@ class SourceLanguageSupportServiceTests {
 	}
 
 	@Test
+	void mediaAzUppercaseCodeSupportsRuKeyword() {
+		Source source = Source.builder()
+				.code("MEDIA_AZ")
+				.supportedLanguages(EnumSet.of(Language.RU))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("sud")
+				.language(Language.RU)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isTrue();
+	}
+
+	@Test
 	void mediaAzDoesNotSupportAzKeyword() {
 		Source source = Source.builder()
 				.code("media_az")
