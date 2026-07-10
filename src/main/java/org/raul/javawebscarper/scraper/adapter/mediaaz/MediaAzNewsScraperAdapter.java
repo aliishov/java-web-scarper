@@ -135,6 +135,15 @@ public class MediaAzNewsScraperAdapter implements NewsScraperAdapter {
 				log.info("media.az dated search returned no cards, retrying with empty date_end: {}", fallbackUrl);
 				page.navigate(fallbackUrl);
 				page.waitForTimeout(1_000);
+				waitForSearchResults(page);
+				cards = collectSearchResultCards(page, context);
+			}
+			if (cards.isEmpty()) {
+				String broadFallbackUrl = searchUrl(keyword.trim());
+				log.info("media.az dated fallbacks returned no cards, retrying broad search URL: {}", broadFallbackUrl);
+				page.navigate(broadFallbackUrl);
+				page.waitForTimeout(1_000);
+				waitForSearchResults(page);
 				cards = collectSearchResultCards(page, context);
 			}
 			MediaAzArticleCollectionResult result = collectArticles(page, cards, context);
@@ -187,17 +196,28 @@ public class MediaAzNewsScraperAdapter implements NewsScraperAdapter {
 				log.warn("media.az UI search did not navigate to search page, using fallback URL: {}", fallbackUrl);
 				page.navigate(fallbackUrl);
 				page.waitForTimeout(1_000);
+				waitForSearchResults(page);
 			} else {
 				log.info("media.az UI search opened, applying dated fallback URL: {}", fallbackUrl);
 				page.navigate(fallbackUrl);
 				page.waitForTimeout(1_000);
+				waitForSearchResults(page);
 			}
 		} catch (BrowserEngineException exception) {
 			log.warn("media.az UI search flow failed, using fallback URL: {}", fallbackUrl);
 			page.navigate(fallbackUrl);
 			page.waitForTimeout(1_000);
+			waitForSearchResults(page);
 		}
 		log.info("media.az search page opened: {}", page.url());
+	}
+
+	private void waitForSearchResults(BrowserPage page) {
+		try {
+			page.waitForSelector(RESULT_CARD_SELECTOR, 5_000);
+		} catch (BrowserTimeoutException exception) {
+			log.debug("media.az search result cards did not appear before timeout: url={}", page.url());
+		}
 	}
 
 	String searchUrl(String keyword) {
