@@ -6,6 +6,8 @@ import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.UnsupportedSourceScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
+import org.raul.javawebscarper.scraper.adapter.onenews.OneNewsAzDateParser;
+import org.raul.javawebscarper.scraper.adapter.onenews.OneNewsAzScraperAdapter;
 
 import java.util.List;
 
@@ -34,6 +36,20 @@ class ScraperAdapterRegistryTests {
 
 		assertThat(registry.findAdapter(source)).isEmpty();
 		assertThat(registry.getAdapter(source)).isSameAs(unsupportedAdapter);
+	}
+
+	@Test
+	void findsOneNewsAzAdapterBySourceCode() {
+		OneNewsAzScraperAdapter oneNewsAdapter = new OneNewsAzScraperAdapter(
+				null,
+				new OneNewsAzDateParser("Asia/Baku")
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(oneNewsAdapter, unsupportedAdapter), unsupportedAdapter);
+		Source source = Source.builder().code("ONE_NEWS_AZ").build();
+
+		assertThat(registry.findAdapter(source)).contains(oneNewsAdapter);
+		assertThat(registry.getAdapter(source)).isSameAs(oneNewsAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("ONE_NEWS_AZ");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {

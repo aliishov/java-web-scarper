@@ -82,4 +82,32 @@ class SourceLanguageSupportServiceTests {
 
 		assertThat(service.isSupported(source, keyword)).isFalse();
 	}
+
+	@Test
+	void oneNewsAzSupportsAzKeyword() {
+		Source source = Source.builder()
+				.code("ONE_NEWS_AZ")
+				.supportedLanguages(EnumSet.of(Language.AZ))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("mehkeme")
+				.language(Language.AZ)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isTrue();
+	}
+
+	@Test
+	void oneNewsAzDoesNotSupportRuKeyword() {
+		Source source = Source.builder()
+				.code("ONE_NEWS_AZ")
+				.supportedLanguages(EnumSet.of(Language.AZ))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("sud")
+				.language(Language.RU)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isFalse();
+	}
 }
