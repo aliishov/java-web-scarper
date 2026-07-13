@@ -7,7 +7,7 @@ final class OneNewsAzSelectors {
 	static final String SEARCH_RESULT = ".gsc-webResult.gsc-result, .gsc-result";
 	static final String SEARCH_RESULT_LINK = ".gs-title a[href], .gsc-thumbnail-inside a[href]";
 	static final String SEARCH_RESULT_SNIPPET = ".gs-snippet, .gsc-table-result .gs-snippet";
-	static final String SEARCH_RESULTS_CONTAINER = ".gsc-control-cse, .gsc-results";
+	static final String SEARCH_RESULTS_CONTAINER = ".gsc-control-cse, .gsc-results, .gsc-no-results-result";
 	static final String SORT_SELECTED = ".gsc-selected-option-container";
 	static final String SORT_SELECTED_TEXT = ".gsc-selected-option, .gsc-selected-option-container";
 	static final String SORT_MENU_ITEM = ".gsc-option-menu-item";
