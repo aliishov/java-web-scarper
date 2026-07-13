@@ -11,10 +11,15 @@ import org.raul.javawebscarper.browser.BrowserPage;
 import org.raul.javawebscarper.browser.BrowserSession;
 import org.raul.javawebscarper.browser.BrowserSessionFactory;
 import org.raul.javawebscarper.browser.BrowserTimeoutException;
+import org.raul.javawebscarper.dto.scraper.ScrapedAuthorDTO;
+import org.raul.javawebscarper.dto.scraper.ScrapedMediaDTO;
+import org.raul.javawebscarper.dto.scraper.ScrapedPostDTO;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.MediaType;
 import org.raul.javawebscarper.scraper.adapter.NewsScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
+import org.raul.javawebscarper.scraper.engine.ScraperExecutionStatus;
 import org.raul.javawebscarper.scraper.support.DateRangeValidator;
 import org.raul.javawebscarper.scraper.support.UrlNormalizer;
 import org.springframework.stereotype.Component;
@@ -22,6 +27,7 @@ import org.springframework.stereotype.Component;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,7 +42,30 @@ import java.util.Set;
 public class HaqqinAzNewsScraperAdapter implements NewsScraperAdapter {
 
 	private static final int MIN_KEYWORD_LENGTH = 3;
+	private static final int MIN_ARTICLE_TEXT_LENGTH = 50;
+	private static final int MIN_PARAGRAPH_TEXT_LENGTH = 20;
 	private static final int MAX_LOAD_MORE_ATTEMPTS = 10;
+	private static final String ARTICLE_CLEANUP_SELECTOR = String.join(", ",
+			".ad-block",
+			".ad-block__wrapper",
+			".ad-block__item",
+			".block-subscribe",
+			".subscribe-item",
+			"iframe",
+			"script",
+			"style",
+			"template",
+			"ins",
+			"[class*=banner]",
+			"[id*=banner]"
+	);
+	private static final ScrapedAuthorDTO AUTHOR = new ScrapedAuthorDTO(
+			"haqqin.az",
+			"haqqin.az",
+			"Haqqin.az",
+			HaqqinAzScraperSupport.BASE_URL,
+			null
+	);
 
 	private final BrowserSessionFactory browserSessionFactory;
 	private final HaqqinAzDateParser dateParser;
@@ -88,7 +117,37 @@ public class HaqqinAzNewsScraperAdapter implements NewsScraperAdapter {
 					searchResult.stats().tooNewSkipped(),
 					searchResult.stats().tooOldSkipped()
 			);
-			return searchResult.cards().isEmpty() ? ScraperExecutionResult.empty() : ScraperExecutionResult.empty();
+			ArticleCollectionResult articleResult = collectArticles(page, searchResult.cards(), context);
+			log.info(
+					"Finished haqqin.az scraping: searchCardsFound={}, acceptedUrls={}, duplicatesSkipped={}, "
+							+ "invalidUrlsSkipped={}, loadMoreClicks={}, batchesProcessed={}, articlePagesOpened={}, "
+							+ "postsFound={}, dateParseFailures={}, tooNewSkipped={}, tooOldSkipped={}, "
+							+ "emptyTextSkipped={}, articleTimeouts={}, mediaCollected={}",
+					searchResult.stats().searchCardsFound(),
+					searchResult.cards().size(),
+					searchResult.stats().duplicatesSkipped() + articleResult.duplicates(),
+					searchResult.stats().invalidUrlsSkipped(),
+					searchResult.stats().loadMoreClicks(),
+					searchResult.stats().batchesProcessed(),
+					articleResult.articlePagesOpened(),
+					articleResult.posts().size(),
+					searchResult.stats().dateParseFailures() + articleResult.dateParseFailures(),
+					searchResult.stats().tooNewSkipped() + articleResult.tooNewSkipped(),
+					searchResult.stats().tooOldSkipped() + articleResult.tooOldSkipped(),
+					articleResult.emptyTextSkipped(),
+					articleResult.articleTimeouts(),
+					articleResult.mediaCollected()
+			);
+			if (!articleResult.posts().isEmpty()) {
+				return ScraperExecutionResult.success(articleResult.posts());
+			}
+			if (searchResult.cards().isEmpty()) {
+				return ScraperExecutionResult.empty();
+			}
+			if (articleResult.hasExtractionFailures()) {
+				return articleResult.toFailedScraperResult(searchResult.cards().size());
+			}
+			return ScraperExecutionResult.empty();
 		} catch (BrowserEngineException exception) {
 			log.warn("haqqin.az scraping failed: {}", exception.getMessage());
 			return ScraperExecutionResult.failed("haqqin.az scraping failed: " + exception.getMessage());
@@ -96,6 +155,242 @@ public class HaqqinAzNewsScraperAdapter implements NewsScraperAdapter {
 			log.error("Unexpected haqqin.az scraping failure", exception);
 			return ScraperExecutionResult.failed("Unexpected haqqin.az scraping failure: " + exception.getMessage());
 		}
+	}
+
+	private ArticleCollectionResult collectArticles(
+			BrowserPage page,
+			List<HaqqinAzSearchResultCard> cards,
+			ScraperExecutionContext context
+	) {
+		List<ScrapedPostDTO> posts = new ArrayList<>();
+		Set<String> seenExternalIds = new LinkedHashSet<>();
+		Set<String> seenPostUrls = new LinkedHashSet<>();
+		int articlePagesOpened = 0;
+		int dateParseFailures = 0;
+		int tooNewSkipped = 0;
+		int tooOldSkipped = 0;
+		int emptyTextSkipped = 0;
+		int articleErrors = 0;
+		int articleTimeouts = 0;
+		int duplicates = 0;
+		int mediaCollected = 0;
+
+		for (HaqqinAzSearchResultCard card : cards) {
+			if (posts.size() >= context.maxPosts()) {
+				break;
+			}
+			articlePagesOpened++;
+			try {
+				ArticleCollectionAttempt attempt = collectArticleWithRetry(page, card, context);
+				if (attempt.post() == null) {
+					if (attempt.skipReason() == ArticleSkipReason.INVALID_DATE) {
+						dateParseFailures++;
+					} else if (attempt.skipReason() == ArticleSkipReason.TOO_NEW) {
+						tooNewSkipped++;
+					} else if (attempt.skipReason() == ArticleSkipReason.TOO_OLD) {
+						tooOldSkipped++;
+					} else if (attempt.skipReason() == ArticleSkipReason.EMPTY_TEXT) {
+						emptyTextSkipped++;
+					}
+					continue;
+				}
+				ScrapedPostDTO post = attempt.post();
+				if (seenExternalIds.add(post.externalPostId()) && seenPostUrls.add(post.postUrl())) {
+					mediaCollected += post.media().size();
+					posts.add(post);
+				} else {
+					duplicates++;
+					log.debug("Skipping duplicate haqqin.az article: url={}, externalPostId={}", post.postUrl(), post.externalPostId());
+				}
+			} catch (BrowserTimeoutException exception) {
+				articleTimeouts++;
+				log.warn("Skipping haqqin.az article after timeout: url={}", card.postUrl());
+			} catch (RuntimeException exception) {
+				articleErrors++;
+				log.warn("Skipping haqqin.az article after parse failure: url={}, error={}", card.postUrl(), exception.getMessage());
+			}
+		}
+		return new ArticleCollectionResult(
+				posts,
+				articlePagesOpened,
+				dateParseFailures,
+				tooNewSkipped,
+				tooOldSkipped,
+				emptyTextSkipped,
+				articleErrors,
+				articleTimeouts,
+				duplicates,
+				mediaCollected
+		);
+	}
+
+	private ArticleCollectionAttempt collectArticleWithRetry(
+			BrowserPage page,
+			HaqqinAzSearchResultCard card,
+			ScraperExecutionContext context
+	) {
+		try {
+			return collectArticle(page, card, context);
+		} catch (BrowserTimeoutException exception) {
+			log.warn("Timeout opening haqqin.az article, retrying once: url={}", card.postUrl());
+			return collectArticle(page, card, context);
+		}
+	}
+
+	private ArticleCollectionAttempt collectArticle(
+			BrowserPage page,
+			HaqqinAzSearchResultCard card,
+			ScraperExecutionContext context
+	) {
+		page.navigate(card.postUrl());
+		page.waitForTimeout(500);
+		Document document = Jsoup.parse(page.content(), card.postUrl());
+		Optional<OffsetDateTime> parsedPostDate = parseArticleDate(document, card);
+		if (parsedPostDate.isEmpty()) {
+			log.warn("Skipping haqqin.az article with missing or invalid date: url={}", card.postUrl());
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.INVALID_DATE);
+		}
+		OffsetDateTime postDate = parsedPostDate.get();
+		if (DateRangeValidator.isAfterRange(postDate, context.dateTo())) {
+			log.debug("Skipping haqqin.az article newer than date range: url={}, postDate={}", card.postUrl(), postDate);
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.TOO_NEW);
+		}
+		if (DateRangeValidator.isBeforeRange(postDate, context.dateFrom())) {
+			log.debug("Skipping haqqin.az article older than date range: url={}, postDate={}", card.postUrl(), postDate);
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.TOO_OLD);
+		}
+
+		String text = extractArticleText(document);
+		if (text == null || text.isBlank()) {
+			log.warn("Skipping haqqin.az article with empty text: url={}, title={}", card.postUrl(), card.title());
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.EMPTY_TEXT);
+		}
+
+		String externalPostId = HaqqinAzScraperSupport.extractExternalPostId(card.postUrl())
+				.orElseGet(() -> Integer.toHexString(card.postUrl().hashCode()));
+		String title = firstNonBlank(
+				text(document, HaqqinAzSelectors.ARTICLE_ROOT + " " + HaqqinAzSelectors.ARTICLE_TITLE),
+				text(document, HaqqinAzSelectors.ARTICLE_ROOT + " " + HaqqinAzSelectors.ARTICLE_TITLE_FALLBACK),
+				card.title()
+		);
+		List<ScrapedMediaDTO> media = extractMedia(document, card);
+		Map<String, Object> metadata = metadata(context, card, title);
+
+		log.info("Collected haqqin.az article: url={}, mediaCount={}", card.postUrl(), media.size());
+		return ArticleCollectionAttempt.collected(new ScrapedPostDTO(
+				externalPostId,
+				card.postUrl(),
+				postDate,
+				AUTHOR,
+				text,
+				"ru",
+				media,
+				metadata
+		));
+	}
+
+	Optional<OffsetDateTime> parseArticleDate(Document document, HaqqinAzSearchResultCard card) {
+		Element root = document.selectFirst(HaqqinAzSelectors.ARTICLE_ROOT);
+		if (root == null) {
+			return Optional.ofNullable(card.searchDate());
+		}
+		for (Element element : root.select(HaqqinAzSelectors.ARTICLE_DATE)) {
+			Optional<OffsetDateTime> parsedDate = dateParser.parseArticleDate(element.text(), card.postUrl());
+			if (parsedDate.isPresent()) {
+				return parsedDate;
+			}
+		}
+		return Optional.ofNullable(card.searchDate());
+	}
+
+	String extractArticleText(Document document) {
+		Element root = document.selectFirst(HaqqinAzSelectors.ARTICLE_ROOT);
+		if (root == null) {
+			return null;
+		}
+		Element content = root.selectFirst(HaqqinAzSelectors.ARTICLE_CONTENT);
+		if (content == null) {
+			return null;
+		}
+		Element cleanContent = cleanedArticleContent(content);
+		Elements paragraphs = cleanContent.select(".article-block .block-text p");
+		if (paragraphs.isEmpty()) {
+			paragraphs = cleanContent.select(".block-text p");
+		}
+		String text = paragraphs.stream()
+				.map(Element::text)
+				.map(this::normalizeArticleText)
+				.filter(this::isArticleParagraph)
+				.reduce((left, right) -> left + "\n" + right)
+				.orElse(null);
+		return isUsableArticleText(text) ? text : null;
+	}
+
+	private Element cleanedArticleContent(Element content) {
+		Element cleanContent = content.clone();
+		cleanContent.select(ARTICLE_CLEANUP_SELECTOR).remove();
+		return cleanContent;
+	}
+
+	private boolean isArticleParagraph(String text) {
+		if (text == null || text.length() < MIN_PARAGRAPH_TEXT_LENGTH) {
+			return false;
+		}
+		String normalized = text.toLowerCase(Locale.ROOT);
+		return !normalized.contains("banners.haqqin.az")
+				&& !normalized.contains("подписывайтесь на наш канал")
+				&& !normalized.contains("iframe")
+				&& !normalized.contains("telegram")
+				&& !normalized.contains("whatsapp")
+				&& !normalized.contains("youtube")
+				&& !normalized.contains("реклама");
+	}
+
+	private boolean isUsableArticleText(String text) {
+		return text != null && text.length() >= MIN_ARTICLE_TEXT_LENGTH;
+	}
+
+	List<ScrapedMediaDTO> extractMedia(Document document, HaqqinAzSearchResultCard card) {
+		Element root = document.selectFirst(HaqqinAzSelectors.ARTICLE_ROOT);
+		Map<String, MediaType> mediaByUrl = new LinkedHashMap<>();
+		if (root != null) {
+			for (Element image : root.select(HaqqinAzSelectors.ARTICLE_MEDIA)) {
+				String rawUrl = firstNonBlank(
+						image.attr("src"),
+						image.attr("data-src"),
+						firstSrcsetUrl(image.attr("srcset")),
+						firstSrcsetUrl(image.attr("data-srcset"))
+				);
+				if (rawUrl == null || !HaqqinAzScraperSupport.isAllowedMediaUrl(rawUrl)) {
+					continue;
+				}
+				String normalizedUrl = UrlNormalizer.resolve(card.postUrl(), rawUrl);
+				if (HaqqinAzScraperSupport.isAllowedMediaUrl(normalizedUrl)) {
+					mediaByUrl.putIfAbsent(normalizedUrl, MediaType.IMAGE);
+				}
+			}
+		}
+		if (mediaByUrl.isEmpty() && card.thumbnailUrl() != null) {
+			mediaByUrl.put(card.thumbnailUrl(), MediaType.IMAGE);
+		}
+
+		List<ScrapedMediaDTO> media = new ArrayList<>();
+		int position = 0;
+		for (Map.Entry<String, MediaType> entry : mediaByUrl.entrySet()) {
+			media.add(new ScrapedMediaDTO(entry.getKey(), entry.getValue(), position++));
+		}
+		return media;
+	}
+
+	private Map<String, Object> metadata(ScraperExecutionContext context, HaqqinAzSearchResultCard card, String title) {
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("source", HaqqinAzScraperSupport.SOURCE_CODE);
+		metadata.put("keyword", context.keyword().getWord());
+		metadata.put("searchBatch", card.searchBatch());
+		if (title != null && !title.isBlank()) {
+			metadata.put("title", title);
+		}
+		return metadata;
 	}
 
 	private SearchCollectionResult openAndCollectSearchResults(
@@ -411,6 +706,13 @@ public class HaqqinAzNewsScraperAdapter implements NewsScraperAdapter {
 		DATE_PARSE
 	}
 
+	private enum ArticleSkipReason {
+		INVALID_DATE,
+		TOO_NEW,
+		TOO_OLD,
+		EMPTY_TEXT
+	}
+
 	record SearchCardParseResult(
 			HaqqinAzSearchResultCard card,
 			SearchCardSkipReason skipReason
@@ -444,6 +746,65 @@ public class HaqqinAzNewsScraperAdapter implements NewsScraperAdapter {
 			List<HaqqinAzSearchResultCard> cards,
 			SearchCollectionStats stats
 	) {
+	}
+
+	private record ArticleCollectionAttempt(
+			ScrapedPostDTO post,
+			ArticleSkipReason skipReason
+	) {
+
+		private static ArticleCollectionAttempt collected(ScrapedPostDTO post) {
+			return new ArticleCollectionAttempt(post, null);
+		}
+
+		private static ArticleCollectionAttempt skipped(ArticleSkipReason reason) {
+			return new ArticleCollectionAttempt(null, reason);
+		}
+	}
+
+	private record ArticleCollectionResult(
+			List<ScrapedPostDTO> posts,
+			int articlePagesOpened,
+			int dateParseFailures,
+			int tooNewSkipped,
+			int tooOldSkipped,
+			int emptyTextSkipped,
+			int articleErrors,
+			int articleTimeouts,
+			int duplicates,
+			int mediaCollected
+	) {
+
+		private boolean hasExtractionFailures() {
+			return dateParseFailures > 0 || emptyTextSkipped > 0 || articleErrors > 0 || articleTimeouts > 0;
+		}
+
+		private ScraperExecutionResult toFailedScraperResult(int candidatesFound) {
+			String message = ("haqqin.az extraction failed: candidatesFound=%d, articlePagesOpened=%d, "
+					+ "dateParseFailures=%d, tooNewSkipped=%d, tooOldSkipped=%d, "
+					+ "emptyTextSkipped=%d, articleErrors=%d, articleTimeouts=%d, "
+					+ "duplicateArticles=%d, postsCollected=0")
+					.formatted(
+							candidatesFound,
+							articlePagesOpened,
+							dateParseFailures,
+							tooNewSkipped,
+							tooOldSkipped,
+							emptyTextSkipped,
+							articleErrors,
+							articleTimeouts,
+							duplicates
+					);
+			return new ScraperExecutionResult(
+					ScraperExecutionStatus.FAILED,
+					List.of(),
+					0,
+					articlePagesOpened,
+					message,
+					null,
+					null
+			);
+		}
 	}
 
 	static final class SearchCollectionStats {
