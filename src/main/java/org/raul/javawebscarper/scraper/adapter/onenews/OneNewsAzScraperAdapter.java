@@ -12,10 +12,14 @@ import org.raul.javawebscarper.browser.BrowserSession;
 import org.raul.javawebscarper.browser.BrowserSessionFactory;
 import org.raul.javawebscarper.browser.BrowserTimeoutException;
 import org.raul.javawebscarper.dto.scraper.ScrapedAuthorDTO;
+import org.raul.javawebscarper.dto.scraper.ScrapedMediaDTO;
+import org.raul.javawebscarper.dto.scraper.ScrapedPostDTO;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.MediaType;
 import org.raul.javawebscarper.scraper.adapter.NewsScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
+import org.raul.javawebscarper.scraper.engine.ScraperExecutionStatus;
 import org.raul.javawebscarper.scraper.support.DateRangeValidator;
 import org.raul.javawebscarper.scraper.support.UrlNormalizer;
 import org.springframework.stereotype.Component;
@@ -39,6 +43,29 @@ import java.util.Set;
 public class OneNewsAzScraperAdapter implements NewsScraperAdapter {
 
 	private static final int MIN_KEYWORD_LENGTH = 3;
+	private static final int MIN_ARTICLE_TEXT_LENGTH = 50;
+	private static final int MIN_PARAGRAPH_TEXT_LENGTH = 20;
+	private static final String ARTICLE_CLEANUP_SELECTOR = String.join(", ",
+			"script",
+			"style",
+			"template",
+			"iframe",
+			"ins",
+			".AdviadNativeVideo",
+			".leftColumnBanner",
+			".leftColumnMobileBanner",
+			".thumb",
+			"[id*=ad]",
+			"[class*=banner]",
+			"[class*=advert]",
+			"[class*=reklam]",
+			"[class*=related]",
+			"[class*=share]",
+			"[class*=comment]",
+			"[class*=social]",
+			"[class*=footer]",
+			"[class*=sidebar]"
+	);
 
 	private static final ScrapedAuthorDTO AUTHOR = new ScrapedAuthorDTO(
 			"1news.az",
@@ -97,6 +124,34 @@ public class OneNewsAzScraperAdapter implements NewsScraperAdapter {
 					searchResult.stats().outOfRangeSkipped(),
 					searchResult.sortingConfirmed()
 			);
+			ArticleCollectionResult articleResult = collectArticles(page, searchResult.cards(), context);
+			log.info(
+					"Finished 1news.az scraping: searchResultsFound={}, accepted1NewsUrls={}, "
+							+ "externalUrlsSkipped={}, duplicatesSkipped={}, pagesProcessed={}, "
+							+ "dateParseFailures={}, outOfRangeSkipped={}, articlesOpened={}, articlesSaved={}, "
+							+ "articlesSkippedEmptyText={}, articleTimeouts={}, sortingConfirmed={}",
+					searchResult.stats().searchResultsFound(),
+					searchResult.cards().size(),
+					searchResult.stats().externalUrlsSkipped(),
+					searchResult.stats().duplicatesSkipped() + articleResult.duplicates(),
+					searchResult.stats().pagesProcessed(),
+					searchResult.stats().dateParseFailures() + articleResult.invalidDates(),
+					searchResult.stats().outOfRangeSkipped() + articleResult.skippedOutOfRange(),
+					articleResult.articlesOpened(),
+					articleResult.posts().size(),
+					articleResult.skippedEmptyText(),
+					articleResult.articleTimeouts(),
+					searchResult.sortingConfirmed()
+			);
+			if (!articleResult.posts().isEmpty()) {
+				return ScraperExecutionResult.success(articleResult.posts());
+			}
+			if (searchResult.cards().isEmpty()) {
+				return ScraperExecutionResult.empty();
+			}
+			if (articleResult.hasExtractionFailures()) {
+				return articleResult.toFailedScraperResult(searchResult.cards().size());
+			}
 			return ScraperExecutionResult.empty();
 		} catch (BrowserEngineException exception) {
 			log.warn("1news.az scraping failed: {}", exception.getMessage());
@@ -105,6 +160,260 @@ public class OneNewsAzScraperAdapter implements NewsScraperAdapter {
 			log.error("Unexpected 1news.az scraping failure", exception);
 			return ScraperExecutionResult.failed("Unexpected 1news.az scraping failure: " + exception.getMessage());
 		}
+	}
+
+	private ArticleCollectionResult collectArticles(
+			BrowserPage page,
+			List<OneNewsAzSearchResultCard> cards,
+			ScraperExecutionContext context
+	) {
+		List<ScrapedPostDTO> posts = new ArrayList<>();
+		Set<String> seenExternalIds = new LinkedHashSet<>();
+		Set<String> seenPostUrls = new LinkedHashSet<>();
+		int articlesOpened = 0;
+		int skippedEmptyText = 0;
+		int skippedOutOfRange = 0;
+		int invalidDates = 0;
+		int skippedErrors = 0;
+		int articleTimeouts = 0;
+		int duplicates = 0;
+
+		for (OneNewsAzSearchResultCard card : cards) {
+			if (posts.size() >= context.maxPosts()) {
+				break;
+			}
+			articlesOpened++;
+			try {
+				ArticleCollectionAttempt attempt = collectArticleWithRetry(page, card, context);
+				if (attempt.post() == null) {
+					if (attempt.skipReason() == ArticleSkipReason.EMPTY_TEXT) {
+						skippedEmptyText++;
+					} else if (attempt.skipReason() == ArticleSkipReason.OUT_OF_RANGE) {
+						skippedOutOfRange++;
+					} else if (attempt.skipReason() == ArticleSkipReason.INVALID_DATE) {
+						invalidDates++;
+					}
+					continue;
+				}
+				ScrapedPostDTO post = attempt.post();
+				if (seenExternalIds.add(post.externalPostId()) && seenPostUrls.add(post.postUrl())) {
+					posts.add(post);
+				} else {
+					duplicates++;
+					log.debug("Skipping duplicate 1news.az article: url={}, externalPostId={}", post.postUrl(), post.externalPostId());
+				}
+			} catch (BrowserTimeoutException exception) {
+				articleTimeouts++;
+				log.warn("Skipping 1news.az article after timeout: url={}", card.postUrl());
+			} catch (RuntimeException exception) {
+				skippedErrors++;
+				log.warn("Skipping 1news.az article after parse failure: url={}, error={}", card.postUrl(), exception.getMessage());
+			}
+		}
+		return new ArticleCollectionResult(
+				posts,
+				articlesOpened,
+				skippedEmptyText,
+				skippedOutOfRange,
+				invalidDates,
+				skippedErrors,
+				articleTimeouts,
+				duplicates
+		);
+	}
+
+	private ArticleCollectionAttempt collectArticleWithRetry(
+			BrowserPage page,
+			OneNewsAzSearchResultCard card,
+			ScraperExecutionContext context
+	) {
+		try {
+			return collectArticle(page, card, context);
+		} catch (BrowserTimeoutException exception) {
+			log.warn("Timeout opening 1news.az article, retrying once: url={}", card.postUrl());
+			return collectArticle(page, card, context);
+		}
+	}
+
+	private ArticleCollectionAttempt collectArticle(
+			BrowserPage page,
+			OneNewsAzSearchResultCard card,
+			ScraperExecutionContext context
+	) {
+		page.navigate(card.postUrl());
+		page.waitForTimeout(500);
+		Document document = Jsoup.parse(page.content(), card.postUrl());
+		Optional<OffsetDateTime> parsedPostDate = parseArticleDate(document, card);
+		if (parsedPostDate.isEmpty()) {
+			log.warn("Skipping 1news.az article with missing or invalid date: url={}", card.postUrl());
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.INVALID_DATE);
+		}
+		OffsetDateTime postDate = parsedPostDate.get();
+		if (!DateRangeValidator.isInsideRange(postDate, context.dateFrom(), context.dateTo())) {
+			log.debug("Skipping 1news.az article outside date range: url={}, postDate={}", card.postUrl(), postDate);
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.OUT_OF_RANGE);
+		}
+
+		String text = extractArticleText(document);
+		if (text == null || text.isBlank()) {
+			log.warn("Skipping 1news.az article with empty text: url={}, title={}", card.postUrl(), card.title());
+			return ArticleCollectionAttempt.skipped(ArticleSkipReason.EMPTY_TEXT);
+		}
+
+		String externalPostId = OneNewsAzScraperSupport.extractExternalPostId(card.postUrl())
+				.orElseGet(() -> Integer.toHexString(card.postUrl().hashCode()));
+		String title = firstNonBlank(text(document, OneNewsAzSelectors.ARTICLE_ROOT + " " + OneNewsAzSelectors.ARTICLE_TITLE), card.title());
+		List<ScrapedMediaDTO> media = extractMedia(document, card);
+		Map<String, Object> metadata = metadata(context, card, title, originalArticleAuthor(document));
+
+		log.info("Collected 1news.az article: url={}, mediaCount={}", card.postUrl(), media.size());
+		return ArticleCollectionAttempt.collected(new ScrapedPostDTO(
+				externalPostId,
+				card.postUrl(),
+				postDate,
+				AUTHOR,
+				text,
+				"az",
+				media,
+				metadata
+		));
+	}
+
+	Optional<OffsetDateTime> parseArticleDate(Document document, OneNewsAzSearchResultCard card) {
+		Element root = document.selectFirst(OneNewsAzSelectors.ARTICLE_ROOT);
+		if (root == null) {
+			return Optional.ofNullable(card.searchDate());
+		}
+		for (Element element : root.select(OneNewsAzSelectors.ARTICLE_DATE)) {
+			Optional<OffsetDateTime> parsedDate = dateParser.parseArticleDate(element.text(), card.postUrl());
+			if (parsedDate.isPresent()) {
+				return parsedDate;
+			}
+		}
+		return Optional.ofNullable(card.searchDate());
+	}
+
+	String extractArticleText(Document document) {
+		Element root = document.selectFirst(OneNewsAzSelectors.ARTICLE_ROOT);
+		if (root == null) {
+			return null;
+		}
+		Element content = root.selectFirst(OneNewsAzSelectors.ARTICLE_CONTENT);
+		if (content == null) {
+			return null;
+		}
+		Element cleanContent = cleanedArticleContent(content);
+		List<Element> paragraphs = cleanContent.children()
+				.stream()
+				.filter(element -> "p".equals(element.normalName()))
+				.toList();
+		if (paragraphs.isEmpty()) {
+			paragraphs = cleanContent.select("p");
+		}
+		String text = paragraphs.stream()
+				.map(Element::text)
+				.map(this::normalizeArticleText)
+				.filter(this::isArticleParagraph)
+				.reduce((left, right) -> left + "\n" + right)
+				.orElse(null);
+		return isUsableArticleText(text) ? text : null;
+	}
+
+	private Element cleanedArticleContent(Element content) {
+		Element cleanContent = content.clone();
+		cleanContent.select(ARTICLE_CLEANUP_SELECTOR).remove();
+		return cleanContent;
+	}
+
+	private boolean isArticleParagraph(String text) {
+		if (text == null || text.length() < MIN_PARAGRAPH_TEXT_LENGTH) {
+			return false;
+		}
+		String normalized = normalizeText(text);
+		return !normalized.equals("reklam")
+				&& !normalized.contains("adviadnativevideo")
+				&& !normalized.contains("get_ads.js")
+				&& !normalized.contains("window._ttzi")
+				&& !normalized.contains("yandex")
+				&& !normalized.contains("googleads");
+	}
+
+	private boolean isUsableArticleText(String text) {
+		return text != null && text.length() >= MIN_ARTICLE_TEXT_LENGTH;
+	}
+
+	List<ScrapedMediaDTO> extractMedia(Document document, OneNewsAzSearchResultCard card) {
+		Map<String, MediaType> mediaByUrl = new LinkedHashMap<>();
+		extractMainImageUrl(document, card.postUrl())
+				.ifPresent(mediaUrl -> mediaByUrl.put(mediaUrl, MediaType.IMAGE));
+		if (mediaByUrl.isEmpty() && card.thumbnailUrl() != null) {
+			mediaByUrl.put(card.thumbnailUrl(), MediaType.IMAGE);
+		}
+
+		List<ScrapedMediaDTO> media = new ArrayList<>();
+		int position = 0;
+		for (Map.Entry<String, MediaType> entry : mediaByUrl.entrySet()) {
+			media.add(new ScrapedMediaDTO(entry.getKey(), entry.getValue(), position++));
+		}
+		return media;
+	}
+
+	private Optional<String> extractMainImageUrl(Document document, String baseUrl) {
+		Element root = document.selectFirst(OneNewsAzSelectors.ARTICLE_ROOT);
+		if (root == null) {
+			return Optional.empty();
+		}
+		Element image = root.selectFirst(OneNewsAzSelectors.ARTICLE_MAIN_IMAGE);
+		if (image == null) {
+			return Optional.empty();
+		}
+		String rawUrl = firstNonBlank(
+				image.attr("src"),
+				image.attr("data-src"),
+				firstSrcsetUrl(image.attr("srcset")),
+				firstSrcsetUrl(image.attr("data-srcset"))
+		);
+		if (rawUrl == null || !OneNewsAzScraperSupport.isAllowedMediaUrl(rawUrl)) {
+			return Optional.empty();
+		}
+		String normalizedUrl = UrlNormalizer.resolve(baseUrl, rawUrl);
+		return OneNewsAzScraperSupport.isAllowedMediaUrl(normalizedUrl)
+				? Optional.of(normalizedUrl)
+				: Optional.empty();
+	}
+
+	private String firstSrcsetUrl(String srcset) {
+		if (srcset == null || srcset.isBlank()) {
+			return null;
+		}
+		String firstCandidate = srcset.split(",")[0].trim();
+		if (firstCandidate.isBlank()) {
+			return null;
+		}
+		return firstCandidate.split("\\s+")[0].trim();
+	}
+
+	private String originalArticleAuthor(Document document) {
+		return text(document, OneNewsAzSelectors.ARTICLE_ROOT + " " + OneNewsAzSelectors.ARTICLE_AUTHOR);
+	}
+
+	private Map<String, Object> metadata(
+			ScraperExecutionContext context,
+			OneNewsAzSearchResultCard card,
+			String title,
+			String originalArticleAuthor
+	) {
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("source", OneNewsAzScraperSupport.SOURCE_CODE);
+		metadata.put("keyword", context.keyword().getWord());
+		metadata.put("searchPageNumber", card.searchPageNumber());
+		if (title != null && !title.isBlank()) {
+			metadata.put("title", title);
+		}
+		if (originalArticleAuthor != null && !originalArticleAuthor.isBlank()) {
+			metadata.put("originalArticleAuthor", originalArticleAuthor);
+		}
+		return metadata;
 	}
 
 	private SearchCollectionResult openAndCollectSearchResults(
@@ -468,6 +777,12 @@ public class OneNewsAzScraperAdapter implements NewsScraperAdapter {
 		DATE_PARSE
 	}
 
+	private enum ArticleSkipReason {
+		EMPTY_TEXT,
+		OUT_OF_RANGE,
+		INVALID_DATE
+	}
+
 	record SearchCardParseResult(
 			OneNewsAzSearchResultCard card,
 			SearchCardSkipReason skipReason
@@ -506,6 +821,62 @@ public class OneNewsAzScraperAdapter implements NewsScraperAdapter {
 			List<OneNewsAzSearchResultCard> cards,
 			SearchCollectionStats stats
 	) {
+	}
+
+	private record ArticleCollectionAttempt(
+			ScrapedPostDTO post,
+			ArticleSkipReason skipReason
+	) {
+
+		private static ArticleCollectionAttempt collected(ScrapedPostDTO post) {
+			return new ArticleCollectionAttempt(post, null);
+		}
+
+		private static ArticleCollectionAttempt skipped(ArticleSkipReason reason) {
+			return new ArticleCollectionAttempt(null, reason);
+		}
+	}
+
+	private record ArticleCollectionResult(
+			List<ScrapedPostDTO> posts,
+			int articlesOpened,
+			int skippedEmptyText,
+			int skippedOutOfRange,
+			int invalidDates,
+			int skippedErrors,
+			int articleTimeouts,
+			int duplicates
+	) {
+
+		private boolean hasExtractionFailures() {
+			return skippedEmptyText > 0 || invalidDates > 0 || skippedErrors > 0 || articleTimeouts > 0;
+		}
+
+		private ScraperExecutionResult toFailedScraperResult(int candidatesFound) {
+			String message = ("1news.az extraction failed: candidatesFound=%d, articlesOpened=%d, "
+					+ "articlesSkippedEmptyText=%d, articlesSkippedOutOfRange=%d, "
+					+ "articleInvalidDates=%d, articleErrors=%d, articleTimeouts=%d, "
+					+ "duplicateArticles=%d, postsCollected=0")
+					.formatted(
+							candidatesFound,
+							articlesOpened,
+							skippedEmptyText,
+							skippedOutOfRange,
+							invalidDates,
+							skippedErrors,
+							articleTimeouts,
+							duplicates
+					);
+			return new ScraperExecutionResult(
+					ScraperExecutionStatus.FAILED,
+					List.of(),
+					0,
+					articlesOpened,
+					message,
+					null,
+					null
+			);
+		}
 	}
 
 	static final class SearchCollectionStats {

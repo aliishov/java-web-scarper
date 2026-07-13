@@ -4,10 +4,13 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.junit.jupiter.api.Test;
+import org.raul.javawebscarper.dto.scraper.ScrapedMediaDTO;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.MediaType;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -109,6 +112,68 @@ class OneNewsAzScraperAdapterTests {
 		assertThat(adapter.nextPageNumber(document, Set.of(1, 2))).contains(3);
 	}
 
+	@Test
+	void parsesArticleDateFromMainArticle() {
+		Document document = articleDocument("""
+				<span class="date">19:12 - 17 / 06 / 2026</span>
+				<div class="content">
+				  <p>The article paragraph is intentionally long enough for this fixture.</p>
+				</div>
+				""");
+
+		assertThat(adapter.parseArticleDate(document, articleCard()))
+				.contains(OffsetDateTime.parse("2026-06-17T19:12:00+04:00"));
+	}
+
+	@Test
+	void extractsArticleTextFromContentParagraphsAndKeepsTextAfterAds() {
+		Document document = articleDocument("""
+				<h1 class="title">Title must not be part of article text</h1>
+				<div class="sectionTitle">Category must not be collected</div>
+				<div class="content">
+				  <div class="thumb"><img src="/images/main.jpg"></div>
+				  <p>The first real article paragraph contains <strong>important highlighted text</strong> for readers.</p>
+				  <script>window._ttzi = 'tracking script must not leak';</script>
+				  <div class="AdviadNativeVideo">AdviadNativeVideo must not leak</div>
+				  <div class="leftColumnBanner"><p>Banner paragraph must be ignored completely.</p></div>
+				  <p>The second real article paragraph appears after advertisement blocks and must not be lost.</p>
+				</div>
+				""");
+
+		String text = adapter.extractArticleText(document);
+
+		assertThat(text)
+				.contains("The first real article paragraph contains important highlighted text")
+				.contains("The second real article paragraph appears after advertisement blocks")
+				.doesNotContain("Title must not be part")
+				.doesNotContain("Category must not be collected")
+				.doesNotContain("window._ttzi")
+				.doesNotContain("AdviadNativeVideo")
+				.doesNotContain("Banner paragraph");
+	}
+
+	@Test
+	void extractsOnlyMainThumbImage() {
+		Document document = articleDocument("""
+				<div class="content">
+				  <div class="thumb"><img src="/images/2026/06/17/20260617191207105/thumb.jpg?2026-06-17+19%3A17%3A34"></div>
+				  <p>The article paragraph is intentionally long enough for this fixture.</p>
+				  <div class="leftColumnBanner"><img src="/images/banner.jpg"></div>
+				  <div class="share"><img src="/images/social-icon.png"></div>
+				</div>
+				<aside><img src="/images/sidebar.jpg"></aside>
+				""");
+
+		List<ScrapedMediaDTO> media = adapter.extractMedia(document, articleCard());
+
+		assertThat(media)
+				.extracting(ScrapedMediaDTO::mediaUrl)
+				.containsExactly("https://1news.az/images/2026/06/17/20260617191207105/thumb.jpg?2026-06-17+19:17:34");
+		assertThat(media)
+				.extracting(ScrapedMediaDTO::mediaType)
+				.containsExactly(MediaType.IMAGE);
+	}
+
 	private Element searchResult(String url) {
 		return Jsoup.parse("""
 				<div class="gsc-webResult gsc-result">
@@ -119,5 +184,28 @@ class OneNewsAzScraperAdapterTests {
 				</div>
 				""".formatted(url), "https://1news.az/az")
 				.selectFirst(".gsc-result");
+	}
+
+	private Document articleDocument(String body) {
+		return Jsoup.parse("""
+				<html>
+				  <body>
+				    <article class="mainArticle">
+				      %s
+				    </article>
+				  </body>
+				</html>
+				""".formatted(body), "https://1news.az/az/news/20260617191207105-title");
+	}
+
+	private OneNewsAzSearchResultCard articleCard() {
+		return new OneNewsAzSearchResultCard(
+				"https://1news.az/az/news/20260617191207105-Yasamaldaki-yanginla-bagli-cinayet-ishi-mehkeme-baxishina-verildi",
+				"Example title",
+				null,
+				OffsetDateTime.parse("2026-06-17T19:12:00+04:00"),
+				null,
+				1
+		);
 	}
 }
