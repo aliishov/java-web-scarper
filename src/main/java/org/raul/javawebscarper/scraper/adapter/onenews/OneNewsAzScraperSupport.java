@@ -19,7 +19,7 @@ public final class OneNewsAzScraperSupport {
 	public static final String BASE_URL = "https://1news.az/az";
 	public static final String ROOT_URL = "https://1news.az";
 
-	private static final Pattern EXTERNAL_ID_PATTERN = Pattern.compile("/(?:az/)?news/(\\d+)(?:-|$)");
+	private static final Pattern EXTERNAL_ID_PATTERN = Pattern.compile("/az/news/(\\d+)(?:-|$)");
 
 	private OneNewsAzScraperSupport() {
 	}
@@ -102,7 +102,7 @@ public final class OneNewsAzScraperSupport {
 		String normalizedHost = host.toLowerCase(Locale.ROOT);
 		String normalizedPath = path.toLowerCase(Locale.ROOT);
 		if ((normalizedHost.equals("1news.az") || normalizedHost.endsWith(".1news.az"))
-				&& (normalizedPath.startsWith("/az/news/") || normalizedPath.startsWith("/news/"))
+				&& normalizedPath.startsWith("/az/news/")
 				&& EXTERNAL_ID_PATTERN.matcher(path).find()) {
 			return Optional.of(normalizedUrl);
 		}

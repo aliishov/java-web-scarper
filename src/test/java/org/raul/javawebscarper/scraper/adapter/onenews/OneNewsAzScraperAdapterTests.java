@@ -86,16 +86,6 @@ class OneNewsAzScraperAdapterTests {
 	}
 
 	@Test
-	void acceptsCanonicalArticleUrlWithoutAzPrefix() {
-		Element result = searchResult("https://1news.az/news/20260617191207105-title");
-
-		OneNewsAzScraperAdapter.SearchCardParseResult parsed = adapter.parseResultCard(result, 1);
-
-		assertThat(parsed.card()).isNotNull();
-		assertThat(parsed.card().postUrl()).isEqualTo("https://1news.az/news/20260617191207105-title");
-	}
-
-	@Test
 	void rejectsExternalSearchResultUrl() {
 		Element result = searchResult("https://example.com/az/news/20260617191207105-title");
 
@@ -111,6 +101,7 @@ class OneNewsAzScraperAdapterTests {
 		assertThat(adapter.parseResultCard(searchResult("https://1news.az/az/axtarish/?q=test"), 1).card()).isNull();
 		assertThat(adapter.parseResultCard(searchResult("https://1news.az/az/muellif/27-Oksana-Orucova"), 1).card()).isNull();
 		assertThat(adapter.parseResultCard(searchResult("https://1news.az/az/siyaset"), 1).card()).isNull();
+		assertThat(adapter.parseResultCard(searchResult("https://1news.az/news/20260617191207105-title"), 1).card()).isNull();
 	}
 
 	@Test
