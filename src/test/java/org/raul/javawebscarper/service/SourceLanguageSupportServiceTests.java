@@ -110,4 +110,32 @@ class SourceLanguageSupportServiceTests {
 
 		assertThat(service.isSupported(source, keyword)).isFalse();
 	}
+
+	@Test
+	void haqqinAzSupportsRuKeyword() {
+		Source source = Source.builder()
+				.code("HAQQIN_AZ")
+				.supportedLanguages(EnumSet.of(Language.RU))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("sud")
+				.language(Language.RU)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isTrue();
+	}
+
+	@Test
+	void haqqinAzDoesNotSupportAzKeyword() {
+		Source source = Source.builder()
+				.code("HAQQIN_AZ")
+				.supportedLanguages(EnumSet.of(Language.RU))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("mehkeme")
+				.language(Language.AZ)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isFalse();
+	}
 }
