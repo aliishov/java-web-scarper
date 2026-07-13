@@ -138,4 +138,32 @@ class SourceLanguageSupportServiceTests {
 
 		assertThat(service.isSupported(source, keyword)).isFalse();
 	}
+
+	@Test
+	void caliberAzSupportsRuKeyword() {
+		Source source = Source.builder()
+				.code("CALIBER_AZ")
+				.supportedLanguages(EnumSet.of(Language.RU))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("sud")
+				.language(Language.RU)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isTrue();
+	}
+
+	@Test
+	void caliberAzDoesNotSupportAzKeyword() {
+		Source source = Source.builder()
+				.code("CALIBER_AZ")
+				.supportedLanguages(EnumSet.of(Language.RU))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("mehkeme")
+				.language(Language.AZ)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isFalse();
+	}
 }
