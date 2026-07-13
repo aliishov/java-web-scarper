@@ -3,7 +3,11 @@ package org.raul.javawebscarper.scraper.adapter.onenews;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.scraper.support.UrlNormalizer;
 
+import java.net.URLDecoder;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -15,7 +19,7 @@ public final class OneNewsAzScraperSupport {
 	public static final String BASE_URL = "https://1news.az/az";
 	public static final String ROOT_URL = "https://1news.az";
 
-	private static final Pattern EXTERNAL_ID_PATTERN = Pattern.compile("/az/news/(\\d+)(?:-|$)");
+	private static final Pattern EXTERNAL_ID_PATTERN = Pattern.compile("/(?:az/)?news/(\\d+)(?:-|$)");
 
 	private OneNewsAzScraperSupport() {
 	}
@@ -33,7 +37,21 @@ public final class OneNewsAzScraperSupport {
 	}
 
 	public static String normalizePostUrl(String url) {
-		return UrlNormalizer.removeTrackingParams(UrlNormalizer.resolve(ROOT_URL, url));
+		return extractArticleUrl(url)
+				.orElseGet(() -> UrlNormalizer.removeTrackingParams(UrlNormalizer.resolve(ROOT_URL, url)));
+	}
+
+	public static Optional<String> extractArticleUrl(String rawUrl) {
+		if (rawUrl == null || rawUrl.isBlank()) {
+			return Optional.empty();
+		}
+		for (String candidate : candidateUrls(rawUrl)) {
+			Optional<String> articleUrl = normalizeDirectArticleUrl(candidate);
+			if (articleUrl.isPresent()) {
+				return articleUrl;
+			}
+		}
+		return Optional.empty();
 	}
 
 	public static Optional<String> extractExternalPostId(String postUrl) {
@@ -57,26 +75,74 @@ public final class OneNewsAzScraperSupport {
 	}
 
 	public static boolean isArticleUrl(String url) {
+		return extractArticleUrl(url).isPresent();
+	}
+
+	private static Optional<String> normalizeDirectArticleUrl(String url) {
 		if (url == null || url.isBlank()) {
-			return false;
+			return Optional.empty();
 		}
-		String normalizedUrl = normalizePostUrl(url);
+		String normalizedUrl;
+		try {
+			normalizedUrl = UrlNormalizer.removeTrackingParams(UrlNormalizer.resolve(ROOT_URL, url));
+		} catch (IllegalArgumentException exception) {
+			return Optional.empty();
+		}
 		URI uri;
 		try {
 			uri = URI.create(normalizedUrl);
 		} catch (IllegalArgumentException exception) {
-			return false;
+			return Optional.empty();
 		}
 		String host = uri.getHost();
 		String path = uri.getPath();
 		if (host == null || path == null) {
-			return false;
+			return Optional.empty();
 		}
 		String normalizedHost = host.toLowerCase(Locale.ROOT);
 		String normalizedPath = path.toLowerCase(Locale.ROOT);
-		return (normalizedHost.equals("1news.az") || normalizedHost.endsWith(".1news.az"))
-				&& normalizedPath.startsWith("/az/news/")
-				&& EXTERNAL_ID_PATTERN.matcher(path).find();
+		if ((normalizedHost.equals("1news.az") || normalizedHost.endsWith(".1news.az"))
+				&& (normalizedPath.startsWith("/az/news/") || normalizedPath.startsWith("/news/"))
+				&& EXTERNAL_ID_PATTERN.matcher(path).find()) {
+			return Optional.of(normalizedUrl);
+		}
+		return Optional.empty();
+	}
+
+	private static List<String> candidateUrls(String rawUrl) {
+		List<String> candidates = new ArrayList<>();
+		candidates.add(rawUrl.trim());
+		try {
+			URI uri = URI.create(rawUrl.trim());
+			String rawQuery = uri.getRawQuery();
+			if (rawQuery == null || rawQuery.isBlank()) {
+				return candidates;
+			}
+			for (String parameter : rawQuery.split("&")) {
+				int separatorIndex = parameter.indexOf('=');
+				if (separatorIndex < 0) {
+					continue;
+				}
+				String name = URLDecoder.decode(parameter.substring(0, separatorIndex), StandardCharsets.UTF_8);
+				if (!isRedirectUrlParameter(name)) {
+					continue;
+				}
+				String value = URLDecoder.decode(parameter.substring(separatorIndex + 1), StandardCharsets.UTF_8);
+				if (!value.isBlank()) {
+					candidates.add(value);
+				}
+			}
+		} catch (IllegalArgumentException exception) {
+			return candidates;
+		}
+		return candidates;
+	}
+
+	private static boolean isRedirectUrlParameter(String name) {
+		String normalized = name.toLowerCase(Locale.ROOT);
+		return normalized.equals("q")
+				|| normalized.equals("url")
+				|| normalized.equals("adurl");
 	}
 
 	public static boolean isAllowedMediaUrl(String mediaUrl) {

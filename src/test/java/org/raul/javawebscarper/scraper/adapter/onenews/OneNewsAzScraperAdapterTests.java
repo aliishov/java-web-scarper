@@ -74,6 +74,28 @@ class OneNewsAzScraperAdapterTests {
 	}
 
 	@Test
+	void extractsArticleSearchResultFromGoogleRedirectUrl() {
+		Element result = searchResult(
+				"https://www.google.com/url?client=internal-element-cse&q=https%3A%2F%2F1news.az%2Faz%2Fnews%2F20260617191207105-title&sa=U"
+		);
+
+		OneNewsAzScraperAdapter.SearchCardParseResult parsed = adapter.parseResultCard(result, 1);
+
+		assertThat(parsed.card()).isNotNull();
+		assertThat(parsed.card().postUrl()).isEqualTo("https://1news.az/az/news/20260617191207105-title");
+	}
+
+	@Test
+	void acceptsCanonicalArticleUrlWithoutAzPrefix() {
+		Element result = searchResult("https://1news.az/news/20260617191207105-title");
+
+		OneNewsAzScraperAdapter.SearchCardParseResult parsed = adapter.parseResultCard(result, 1);
+
+		assertThat(parsed.card()).isNotNull();
+		assertThat(parsed.card().postUrl()).isEqualTo("https://1news.az/news/20260617191207105-title");
+	}
+
+	@Test
 	void rejectsExternalSearchResultUrl() {
 		Element result = searchResult("https://example.com/az/news/20260617191207105-title");
 

@@ -626,10 +626,15 @@ public class OneNewsAzScraperAdapter implements NewsScraperAdapter {
 		if (link == null) {
 			return SearchCardParseResult.skipped(SearchCardSkipReason.EXTERNAL_OR_INVALID_URL);
 		}
-		String normalizedUrl = OneNewsAzScraperSupport.normalizePostUrl(firstNonBlank(
+		String rawUrl = firstNonBlank(
 				link.attr("data-ctorig"),
+				link.attr("data-cturl"),
 				link.attr("href")
-		));
+		);
+		String normalizedUrl = OneNewsAzScraperSupport.extractArticleUrl(rawUrl).orElse(null);
+		if (normalizedUrl == null) {
+			return SearchCardParseResult.skipped(SearchCardSkipReason.EXTERNAL_OR_INVALID_URL);
+		}
 		String snippet = text(element, OneNewsAzSelectors.SEARCH_RESULT_SNIPPET);
 		OffsetDateTime searchDate = null;
 		if (looksLikeOneNewsDate(snippet)) {
@@ -653,6 +658,7 @@ public class OneNewsAzScraperAdapter implements NewsScraperAdapter {
 				.stream()
 				.filter(link -> OneNewsAzScraperSupport.isArticleUrl(firstNonBlank(
 						link.attr("data-ctorig"),
+						link.attr("data-cturl"),
 						link.attr("href")
 				)))
 				.findFirst();
@@ -718,7 +724,9 @@ public class OneNewsAzScraperAdapter implements NewsScraperAdapter {
 				.stream()
 				.map(this::findArticleLink)
 				.flatMap(Optional::stream)
-				.map(link -> OneNewsAzScraperSupport.normalizePostUrl(firstNonBlank(link.attr("data-ctorig"), link.attr("href"))))
+				.map(link -> firstNonBlank(link.attr("data-ctorig"), link.attr("data-cturl"), link.attr("href")))
+				.map(OneNewsAzScraperSupport::extractArticleUrl)
+				.flatMap(Optional::stream)
 				.findFirst();
 	}
 
