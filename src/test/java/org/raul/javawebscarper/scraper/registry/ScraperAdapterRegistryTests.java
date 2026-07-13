@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.UnsupportedSourceScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzDateParser;
+import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
 import org.raul.javawebscarper.scraper.adapter.onenews.OneNewsAzDateParser;
@@ -50,6 +52,20 @@ class ScraperAdapterRegistryTests {
 		assertThat(registry.findAdapter(source)).contains(oneNewsAdapter);
 		assertThat(registry.getAdapter(source)).isSameAs(oneNewsAdapter);
 		assertThat(registry.getRegisteredSourceCodes()).contains("ONE_NEWS_AZ");
+	}
+
+	@Test
+	void findsHaqqinAzAdapterBySourceCode() {
+		HaqqinAzNewsScraperAdapter haqqinAdapter = new HaqqinAzNewsScraperAdapter(
+				null,
+				new HaqqinAzDateParser("Asia/Baku")
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(haqqinAdapter, unsupportedAdapter), unsupportedAdapter);
+		Source source = Source.builder().code("HAQQIN_AZ").build();
+
+		assertThat(registry.findAdapter(source)).contains(haqqinAdapter);
+		assertThat(registry.getAdapter(source)).isSameAs(haqqinAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("HAQQIN_AZ");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {
