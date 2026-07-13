@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.UnsupportedSourceScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzDateParser;
+import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
@@ -66,6 +68,20 @@ class ScraperAdapterRegistryTests {
 		assertThat(registry.findAdapter(source)).contains(haqqinAdapter);
 		assertThat(registry.getAdapter(source)).isSameAs(haqqinAdapter);
 		assertThat(registry.getRegisteredSourceCodes()).contains("HAQQIN_AZ");
+	}
+
+	@Test
+	void findsCaliberAzAdapterBySourceCode() {
+		CaliberAzNewsScraperAdapter caliberAdapter = new CaliberAzNewsScraperAdapter(
+				null,
+				new CaliberAzDateParser("Asia/Baku")
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(caliberAdapter, unsupportedAdapter), unsupportedAdapter);
+		Source source = Source.builder().code("CALIBER_AZ").build();
+
+		assertThat(registry.findAdapter(source)).contains(caliberAdapter);
+		assertThat(registry.getAdapter(source)).isSameAs(caliberAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("CALIBER_AZ");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {
