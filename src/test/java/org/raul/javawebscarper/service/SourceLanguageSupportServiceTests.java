@@ -166,4 +166,32 @@ class SourceLanguageSupportServiceTests {
 
 		assertThat(service.isSupported(source, keyword)).isFalse();
 	}
+
+	@Test
+	void qafqazInfoAzSupportsAzKeyword() {
+		Source source = Source.builder()
+				.code("QAFQAZINFO_AZ")
+				.supportedLanguages(EnumSet.of(Language.AZ))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("mehkeme")
+				.language(Language.AZ)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isTrue();
+	}
+
+	@Test
+	void qafqazInfoAzDoesNotSupportRuKeyword() {
+		Source source = Source.builder()
+				.code("QAFQAZINFO_AZ")
+				.supportedLanguages(EnumSet.of(Language.AZ))
+				.build();
+		Keyword keyword = Keyword.builder()
+				.word("sud")
+				.language(Language.RU)
+				.build();
+
+		assertThat(service.isSupported(source, keyword)).isFalse();
+	}
 }
