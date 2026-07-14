@@ -8,6 +8,8 @@ import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzNewsScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.qafqazinfoaz.QafqazInfoAzDateParser;
+import org.raul.javawebscarper.scraper.adapter.qafqazinfoaz.QafqazInfoAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
 import org.raul.javawebscarper.scraper.adapter.onenews.OneNewsAzDateParser;
@@ -82,6 +84,20 @@ class ScraperAdapterRegistryTests {
 		assertThat(registry.findAdapter(source)).contains(caliberAdapter);
 		assertThat(registry.getAdapter(source)).isSameAs(caliberAdapter);
 		assertThat(registry.getRegisteredSourceCodes()).contains("CALIBER_AZ");
+	}
+
+	@Test
+	void findsQafqazInfoAzAdapterBySourceCode() {
+		QafqazInfoAzNewsScraperAdapter qafqazInfoAdapter = new QafqazInfoAzNewsScraperAdapter(
+				null,
+				new QafqazInfoAzDateParser("Asia/Baku")
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(qafqazInfoAdapter, unsupportedAdapter), unsupportedAdapter);
+		Source source = Source.builder().code("QAFQAZINFO_AZ").build();
+
+		assertThat(registry.findAdapter(source)).contains(qafqazInfoAdapter);
+		assertThat(registry.getAdapter(source)).isSameAs(qafqazInfoAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("QAFQAZINFO_AZ");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {
