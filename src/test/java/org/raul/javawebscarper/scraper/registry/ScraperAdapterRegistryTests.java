@@ -8,6 +8,9 @@ import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzNewsScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzDateParser;
+import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzNewsScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzSearchPeriodResolver;
 import org.raul.javawebscarper.scraper.adapter.qafqazinfoaz.QafqazInfoAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.qafqazinfoaz.QafqazInfoAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
@@ -98,6 +101,21 @@ class ScraperAdapterRegistryTests {
 		assertThat(registry.findAdapter(source)).contains(qafqazInfoAdapter);
 		assertThat(registry.getAdapter(source)).isSameAs(qafqazInfoAdapter);
 		assertThat(registry.getRegisteredSourceCodes()).contains("QAFQAZINFO_AZ");
+	}
+
+	@Test
+	void findsLentAzAdapterBySourceCode() {
+		LentAzNewsScraperAdapter lentAdapter = new LentAzNewsScraperAdapter(
+				null,
+				new LentAzDateParser("Asia/Baku"),
+				new LentAzSearchPeriodResolver("Asia/Baku")
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(lentAdapter, unsupportedAdapter), unsupportedAdapter);
+		Source source = Source.builder().code("LENT_AZ").build();
+
+		assertThat(registry.findAdapter(source)).contains(lentAdapter);
+		assertThat(registry.getAdapter(source)).isSameAs(lentAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("LENT_AZ");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {
