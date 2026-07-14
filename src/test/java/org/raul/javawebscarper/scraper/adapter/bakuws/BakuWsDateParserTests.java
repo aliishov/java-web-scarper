@@ -33,6 +33,16 @@ class BakuWsDateParserTests {
 	}
 
 	@Test
+	void parsesUnicodeRelativeResultCardDates() {
+		assertThat(parser.parseResultCardDate("Bug\u00fcn", "11:45"))
+				.contains(OffsetDateTime.parse("2026-07-07T11:45:00+04:00"));
+		assertThat(parser.parseResultCardDate("Bu g\u00fcn", "12:15"))
+				.contains(OffsetDateTime.parse("2026-07-07T12:15:00+04:00"));
+		assertThat(parser.parseResultCardDate("D\u00fcn\u0259n", "22:10"))
+				.contains(OffsetDateTime.parse("2026-07-06T22:10:00+04:00"));
+	}
+
+	@Test
 	void parsesTodayResultCardDate() {
 		Optional<OffsetDateTime> result = parser.parseResultCardDate("Bugün", "11:45");
 

@@ -43,7 +43,7 @@ class BakuWsNewsScraperAdapterTests {
 
 	@Test
 	void buildsEncodedFallbackSearchUrl() {
-		assertThat(adapter.searchUrl("Məhkəmə"))
+		assertThat(adapter.searchUrl("M\u0259hk\u0259m\u0259"))
 				.isEqualTo("https://baku.ws/search?query=M%C9%99hk%C9%99m%C9%99");
 	}
 
