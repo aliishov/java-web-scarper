@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.UnsupportedSourceScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.bakuws.BakuWsDateParser;
+import org.raul.javawebscarper.scraper.adapter.bakuws.BakuWsNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzDateParser;
@@ -45,6 +47,22 @@ class ScraperAdapterRegistryTests {
 
 		assertThat(registry.findAdapter(source)).isEmpty();
 		assertThat(registry.getAdapter(source)).isSameAs(unsupportedAdapter);
+	}
+
+	@Test
+	void findsOnlyOneBakuWsAdapterBySourceCode() {
+		BakuWsNewsScraperAdapter bakuWsAdapter = new BakuWsNewsScraperAdapter(
+				null,
+				new BakuWsDateParser("Asia/Baku")
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(bakuWsAdapter, unsupportedAdapter), unsupportedAdapter);
+		Source source = Source.builder().code("BAKU_WS").build();
+
+		assertThat(registry.findAdapter(source)).contains(bakuWsAdapter);
+		assertThat(registry.getAdapter(source)).isSameAs(bakuWsAdapter);
+		assertThat(registry.getRegisteredSourceCodes())
+				.filteredOn("BAKU_WS"::equals)
+				.hasSize(1);
 	}
 
 	@Test

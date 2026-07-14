@@ -748,7 +748,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		}
 	}
 
-	private enum CardSkipReason {
+	enum CardSkipReason {
 		AD,
 		MISSING_URL,
 		DATE_PARSE
@@ -759,7 +759,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		OUT_OF_RANGE
 	}
 
-	private record CardParseResult(
+	record CardParseResult(
 			BakuWsSearchResultCard card,
 			CardSkipReason skipReason
 	) {

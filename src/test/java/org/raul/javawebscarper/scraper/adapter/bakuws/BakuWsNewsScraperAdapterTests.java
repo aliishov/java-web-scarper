@@ -42,6 +42,64 @@ class BakuWsNewsScraperAdapterTests {
 	}
 
 	@Test
+	void buildsEncodedFallbackSearchUrl() {
+		assertThat(adapter.searchUrl("Məhkəmə"))
+				.isEqualTo("https://baku.ws/search?query=M%C9%99hk%C9%99m%C9%99");
+	}
+
+	@Test
+	void extractsSearchCardUsingDataUrlPriorityAndScopedThumbnail() {
+		Document document = Jsoup.parse("""
+				<div class="post-item">
+				  <div class="post-item-img">
+				    <a href="https://baku.ws/incident/image-link-111">
+				      <img src="/storage/photos/uploads/thumbs/list/example.webp">
+				      <span class="post-item-date">
+				        <span class="post-item-date-time">21:41</span>
+				        <span class="post-item-date-day">27 iyun 2026</span>
+				      </span>
+				    </a>
+				  </div>
+				  <div class="post-item-content rt-news-item" data-url="https://baku.ws/diger/data-url-title-553631">
+				    <h3 class="post-item-title">
+				      <a href="https://baku.ws/politics/title-link-222">Search result title</a>
+				    </h3>
+				  </div>
+				</div>
+				<div class="cat-left-bnr"><img src="/images/banners/placeholder_home_right_az.jpg"></div>
+				""", "https://baku.ws/search?query=court");
+
+		BakuWsNewsScraperAdapter.CardParseResult parsed = adapter.parseResultCard(document.selectFirst(".post-item"), 4);
+
+		assertThat(parsed.card()).isNotNull();
+		assertThat(parsed.card().postUrl()).isEqualTo("https://baku.ws/diger/data-url-title-553631");
+		assertThat(parsed.card().title()).isEqualTo("Search result title");
+		assertThat(parsed.card().postDate()).isEqualTo(OffsetDateTime.parse("2026-06-27T21:41:00+04:00"));
+		assertThat(parsed.card().thumbnailUrl())
+				.isEqualTo("https://baku.ws/storage/photos/uploads/thumbs/list/example.webp");
+		assertThat(parsed.card().scrollBatch()).isEqualTo(4);
+	}
+
+	@Test
+	void skipsSearchAdsAndInvalidResultUrls() {
+		Document document = Jsoup.parse("""
+				<div class="cat-left-bnr">
+				  <div class="post-item">
+				    <div class="post-item-content" data-url="https://baku.ws/diger/ad-111"></div>
+				  </div>
+				</div>
+				<div class="post-item">
+				  <div class="post-item-content" data-url="https://baku.ws/tag/court"></div>
+				  <span class="post-item-date-time">21:41</span>
+				  <span class="post-item-date-day">27 iyun 2026</span>
+				</div>
+				""", "https://baku.ws/search?query=court");
+
+		assertThat(adapter.parseResultCard(document.select(".post-item").get(0), 1).card()).isNull();
+		assertThat(adapter.parseResultCard(document.select(".post-item").get(1), 1).card()).isNull();
+	}
+
+	@Test
 	void extractsArticleTextFromPostDetailContentParagraphs() {
 		Document document = Jsoup.parse("""
 				<html>
