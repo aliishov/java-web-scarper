@@ -181,8 +181,9 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			page.navigate(BakuWsScraperSupport.BASE_URL);
 			clickSearchToggle(page);
 			waitForSearchForm(page);
-			page.fill(BakuWsSelectors.SEARCH_INPUT, keyword);
-			page.press(BakuWsSelectors.SEARCH_INPUT, "Enter");
+			String searchInputSelector = waitForSearchInput(page);
+			page.fill(searchInputSelector, keyword);
+			page.press(searchInputSelector, "Enter");
 			page.waitForTimeout(1_000);
 			if (!page.url().contains("/search")) {
 				log.warn("baku.ws UI search did not navigate to search page, using fallback URL: {}", fallbackUrl);
@@ -218,7 +219,16 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		} catch (BrowserEngineException exception) {
 			page.waitForSelector(BakuWsSelectors.SEARCH_FORM, 5_000);
 		}
-		page.waitForSelector(BakuWsSelectors.SEARCH_INPUT, 5_000);
+	}
+
+	private String waitForSearchInput(BrowserPage page) {
+		try {
+			page.waitForSelector(BakuWsSelectors.SEARCH_INPUT, 5_000);
+			return BakuWsSelectors.SEARCH_INPUT;
+		} catch (BrowserEngineException exception) {
+			page.waitForSelector(BakuWsSelectors.SEARCH_INPUT_FALLBACK, 5_000);
+			return BakuWsSelectors.SEARCH_INPUT_FALLBACK;
+		}
 	}
 
 	String searchUrl(String keyword) {
