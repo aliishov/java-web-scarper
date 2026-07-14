@@ -366,7 +366,7 @@ public class QafqazInfoAzNewsScraperAdapter implements NewsScraperAdapter {
 		Optional<String> numberedLink = document.select(QafqazInfoAzSelectors.PAGINATION_PAGE_LINK)
 				.stream()
 				.filter(link -> parsePageNumber(link.text()).filter(pageNumber -> pageNumber == nextPage).isPresent())
-				.map(link -> normalizePageUrl(UrlNormalizer.resolve(currentUrl, link.attr("href"))))
+				.map(link -> resolvePageHref(currentUrl, link.attr("href")))
 				.filter(url -> !visitedPageUrls.contains(url))
 				.findFirst();
 		if (numberedLink.isPresent() && !visitedPageNumbers.contains(nextPage)) {
@@ -374,7 +374,7 @@ public class QafqazInfoAzNewsScraperAdapter implements NewsScraperAdapter {
 		}
 		Optional<String> nextLink = document.select(QafqazInfoAzSelectors.PAGINATION_NEXT_LINK)
 				.stream()
-				.map(link -> normalizePageUrl(UrlNormalizer.resolve(currentUrl, link.attr("href"))))
+				.map(link -> resolvePageHref(currentUrl, link.attr("href")))
 				.filter(url -> !url.equals(normalizePageUrl(currentUrl)))
 				.filter(url -> !visitedPageUrls.contains(url))
 				.filter(url -> currentPageNumber(url, document) > currentPage)
@@ -382,12 +382,20 @@ public class QafqazInfoAzNewsScraperAdapter implements NewsScraperAdapter {
 		if (nextLink.isPresent()) {
 			return nextLink;
 		}
-		if (document.selectFirst(QafqazInfoAzSelectors.PAGINATION_ROOT) == null || visitedPageNumbers.contains(nextPage)) {
-			return Optional.empty();
+		return Optional.empty();
+	}
+
+	private String resolvePageHref(String currentUrl, String href) {
+		if (href == null || href.isBlank()) {
+			return normalizePageUrl(currentUrl);
 		}
-		return Optional.of(searchUrl(keyword) + "&page=" + nextPage)
-				.map(this::normalizePageUrl)
-				.filter(url -> !visitedPageUrls.contains(url));
+		String trimmed = href.trim();
+		if (trimmed.startsWith("?")) {
+			int queryIndex = currentUrl.indexOf('?');
+			String base = queryIndex < 0 ? currentUrl : currentUrl.substring(0, queryIndex);
+			return normalizePageUrl(base + trimmed);
+		}
+		return normalizePageUrl(UrlNormalizer.resolve(currentUrl, trimmed));
 	}
 
 	private boolean openNextPage(BrowserPage page, String nextPageUrl, Set<String> alreadySeenPostUrls, SearchCollectionStats stats) {
