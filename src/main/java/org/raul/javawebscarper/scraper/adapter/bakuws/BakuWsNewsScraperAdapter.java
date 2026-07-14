@@ -41,22 +41,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 
-	private static final String SEARCH_INPUT_SELECTOR = "form.custom-navbar-search-block input[name='query']";
-	private static final String SEARCH_ICON_SELECTOR = "svg.svg-icon.normal";
-	private static final String RESULT_CARD_SELECTOR = ".post-item";
 	private static final int MIN_ARTICLE_TEXT_LENGTH = 50;
 	private static final int MIN_PARAGRAPH_TEXT_LENGTH = 20;
-	private static final String ARTICLE_MAIN_IMAGE_SELECTOR = String.join(", ",
-			".post-detail-top .post-detail-img > img[src]",
-			".post-detail-top .post-detail-img > img[data-src]",
-			".post-detail-top .post-detail-img > img[srcset]",
-			".post-detail-top .post-detail-img > img[data-srcset]"
-	);
-	private static final String ARTICLE_DATE_DAY_SELECTOR = ".post-detail-top .post-detail-img .post-date-day";
-	private static final String ARTICLE_DATE_MONTH_SELECTOR = ".post-detail-top .post-detail-img .post-date-month";
-	private static final String ARTICLE_DATE_YEAR_SELECTOR = ".post-detail-top .post-detail-img .post-date-year";
-	private static final String ARTICLE_DATE_TIME_SELECTOR = ".post-detail-top .post-detail-img .post-date-time";
-	private static final String ARTICLE_TEXT_CONTENT_SELECTOR = ".post-detail-content.resize-area";
 	private static final String[] ARTICLE_ROOT_SELECTORS = {
 			".post-detail.post-detail-area",
 			".post-detail",
@@ -193,9 +179,10 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		try {
 			log.info("Opening baku.ws search through UI flow: keyword={}", keyword);
 			page.navigate(BakuWsScraperSupport.BASE_URL);
-			page.click(SEARCH_ICON_SELECTOR);
-			page.fill(SEARCH_INPUT_SELECTOR, keyword);
-			page.press(SEARCH_INPUT_SELECTOR, "Enter");
+			clickSearchToggle(page);
+			waitForSearchForm(page);
+			page.fill(BakuWsSelectors.SEARCH_INPUT, keyword);
+			page.press(BakuWsSelectors.SEARCH_INPUT, "Enter");
 			page.waitForTimeout(1_000);
 			if (!page.url().contains("/search")) {
 				log.warn("baku.ws UI search did not navigate to search page, using fallback URL: {}", fallbackUrl);
@@ -210,7 +197,31 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		log.info("baku.ws search page opened: {}", page.url());
 	}
 
-	private String searchUrl(String keyword) {
+	private void clickSearchToggle(BrowserPage page) {
+		BrowserEngineException lastException = null;
+		for (String selector : BakuWsSelectors.SEARCH_TOGGLE_SELECTORS) {
+			try {
+				page.waitForSelector(selector, 3_000);
+				page.click(selector);
+				return;
+			} catch (BrowserEngineException exception) {
+				lastException = exception;
+				log.debug("baku.ws search toggle selector did not work: selector={}", selector);
+			}
+		}
+		throw new BrowserEngineException("baku.ws search toggle was not found", lastException);
+	}
+
+	private void waitForSearchForm(BrowserPage page) {
+		try {
+			page.waitForSelector(BakuWsSelectors.SEARCH_FORM_OPEN, 5_000);
+		} catch (BrowserEngineException exception) {
+			page.waitForSelector(BakuWsSelectors.SEARCH_FORM, 5_000);
+		}
+		page.waitForSelector(BakuWsSelectors.SEARCH_INPUT, 5_000);
+	}
+
+	String searchUrl(String keyword) {
 		return BakuWsScraperSupport.BASE_URL + "search?query="
 				+ URLEncoder.encode(keyword, StandardCharsets.UTF_8);
 	}
@@ -260,7 +271,10 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			Set<String> seenUrls
 	) {
 		Document document = Jsoup.parse(page.content(), BakuWsScraperSupport.BASE_URL);
-		Elements elements = document.select(RESULT_CARD_SELECTOR);
+		Elements elements = document.select(BakuWsSelectors.RESULT_CARD);
+		if (elements.isEmpty()) {
+			elements = document.select(BakuWsSelectors.RESULT_CARD_FALLBACK);
+		}
 		int found = elements.size();
 		int added = 0;
 		int duplicates = 0;
@@ -316,30 +330,38 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		);
 	}
 
-	private CardParseResult parseResultCard(Element element) {
-		if (element.parents().stream().anyMatch(parent -> parent.hasClass("cat-left-bnr"))) {
+	CardParseResult parseResultCard(Element element) {
+		if (isAdCard(element)) {
 			return CardParseResult.skipped(CardSkipReason.AD);
 		}
 		String postUrl = firstNonBlank(
-				element.selectFirst(".post-item-title a") == null ? null : element.selectFirst(".post-item-title a").attr("href"),
-				element.selectFirst(".post-item-img a") == null ? null : element.selectFirst(".post-item-img a").attr("href"),
-				element.selectFirst(".post-item-content[data-url]") == null
+				element.selectFirst(BakuWsSelectors.RESULT_CARD_DATA_URL) == null
 						? null
-						: element.selectFirst(".post-item-content[data-url]").attr("data-url")
+						: element.selectFirst(BakuWsSelectors.RESULT_CARD_DATA_URL).attr("data-url"),
+				element.selectFirst(BakuWsSelectors.RESULT_CARD_TITLE_LINK) == null
+						? null
+						: element.selectFirst(BakuWsSelectors.RESULT_CARD_TITLE_LINK).attr("href"),
+				element.selectFirst(BakuWsSelectors.RESULT_CARD_IMAGE_LINK) == null
+						? null
+						: element.selectFirst(BakuWsSelectors.RESULT_CARD_IMAGE_LINK).attr("href")
 		);
 		if (postUrl == null) {
 			log.warn("Skipping baku.ws card without post URL");
 			return CardParseResult.skipped(CardSkipReason.MISSING_URL);
 		}
 		String normalizedUrl = BakuWsScraperSupport.normalizePostUrl(postUrl);
-		String time = text(element, ".post-item-date-time");
-		String day = text(element, ".post-item-date-day");
+		if (normalizedUrl == null) {
+			log.warn("Skipping baku.ws card with invalid post URL: rawUrl={}", postUrl);
+			return CardParseResult.skipped(CardSkipReason.MISSING_URL);
+		}
+		String time = text(element, BakuWsSelectors.RESULT_CARD_TIME);
+		String day = text(element, BakuWsSelectors.RESULT_CARD_DAY);
 		Optional<OffsetDateTime> postDate = dateParser.parseResultCardDate(day, time);
 		if (postDate.isEmpty()) {
 			log.warn("Skipping baku.ws card with unparseable date: url={}, day={}, time={}", normalizedUrl, day, time);
 			return CardParseResult.skipped(CardSkipReason.DATE_PARSE);
 		}
-		String thumbnailUrl = Optional.ofNullable(element.selectFirst(".post-item-img img"))
+		String thumbnailUrl = Optional.ofNullable(element.selectFirst(BakuWsSelectors.RESULT_CARD_THUMBNAIL))
 				.map(image -> firstNonBlank(image.attr("src"), image.attr("data-src")))
 				.filter(value -> !value.isBlank())
 				.map(value -> UrlNormalizer.resolve(BakuWsScraperSupport.BASE_URL, value))
@@ -348,10 +370,19 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 
 		return CardParseResult.card(new BakuWsSearchResultCard(
 				normalizedUrl,
-				text(element, ".post-item-title a"),
+				text(element, BakuWsSelectors.RESULT_CARD_TITLE),
 				postDate.get(),
 				thumbnailUrl
 		));
+	}
+
+	private boolean isAdCard(Element element) {
+		if (element == null) {
+			return false;
+		}
+		return element.is(BakuWsSelectors.SEARCH_AD_BLOCK)
+				|| element.parents().stream().anyMatch(parent -> parent.is(BakuWsSelectors.SEARCH_AD_BLOCK))
+				|| element.selectFirst("[class*=banner], img[src*='/images/banners/'], img[src*=placeholder_home]") != null;
 	}
 
 	private BakuWsArticleCollectionResult collectArticles(
@@ -460,10 +491,10 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	}
 
 	Optional<OffsetDateTime> parseArticleDate(Document document) {
-		String day = text(document, ARTICLE_DATE_DAY_SELECTOR);
-		String month = text(document, ARTICLE_DATE_MONTH_SELECTOR);
-		String year = text(document, ARTICLE_DATE_YEAR_SELECTOR);
-		String time = text(document, ARTICLE_DATE_TIME_SELECTOR);
+		String day = text(document, BakuWsSelectors.ARTICLE_DATE_DAY);
+		String month = text(document, BakuWsSelectors.ARTICLE_DATE_MONTH);
+		String year = text(document, BakuWsSelectors.ARTICLE_DATE_YEAR);
+		String time = text(document, BakuWsSelectors.ARTICLE_DATE_TIME);
 		if (day != null && month != null && year != null && time != null) {
 			Optional<OffsetDateTime> parsedDate = dateParser.parseArticleDate(day, month, year, time);
 			if (parsedDate.isPresent()) {
@@ -508,7 +539,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	private List<Element> findArticleTextRoots(Document document) {
 		List<Element> roots = new ArrayList<>();
 		Set<Element> seen = new LinkedHashSet<>();
-		for (Element root : document.select(ARTICLE_TEXT_CONTENT_SELECTOR)) {
+		for (Element root : document.select(BakuWsSelectors.ARTICLE_TEXT_CONTENT)) {
 			if (seen.add(root)) {
 				roots.add(root);
 			}
@@ -626,7 +657,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	}
 
 	private Optional<String> extractMainImageUrl(Document document, String baseUrl) {
-		Element image = document.selectFirst(ARTICLE_MAIN_IMAGE_SELECTOR);
+		Element image = document.selectFirst(BakuWsSelectors.ARTICLE_MAIN_IMAGE);
 		if (image == null) {
 			return Optional.empty();
 		}
