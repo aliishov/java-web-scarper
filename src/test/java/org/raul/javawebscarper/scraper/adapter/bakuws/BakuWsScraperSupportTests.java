@@ -26,10 +26,26 @@ class BakuWsScraperSupportTests {
 	}
 
 	@Test
+	void extractsExternalPostIdFromDataPageBeforeUrl() {
+		assertThat(BakuWsScraperSupport.extractExternalPostId("553631", "https://baku.ws/diger/example-slug/"))
+				.contains("553631");
+	}
+
+	@Test
 	void normalizesPostUrlAndRemovesTrackingParameters() {
 		String result = BakuWsScraperSupport.normalizePostUrl("/diger/example-slug?utm_source=x&id=7");
 
 		assertThat(result).isEqualTo("https://baku.ws/diger/example-slug?id=7");
+	}
+
+	@Test
+	void rejectsNonArticleUrls() {
+		assertThat(BakuWsScraperSupport.normalizePostUrl("https://baku.ws/search?query=court")).isNull();
+		assertThat(BakuWsScraperSupport.normalizePostUrl("https://baku.ws/tag/court")).isNull();
+		assertThat(BakuWsScraperSupport.normalizePostUrl("https://baku.ws/incident")).isNull();
+		assertThat(BakuWsScraperSupport.normalizePostUrl("https://baku.ws/storage/photos/article.webp")).isNull();
+		assertThat(BakuWsScraperSupport.normalizePostUrl("https://yandex.ru/ad")).isNull();
+		assertThat(BakuWsScraperSupport.normalizePostUrl("https://facebook.com/baku.ws")).isNull();
 	}
 
 	@Test

@@ -6,6 +6,7 @@ record BakuWsSearchResultCard(
 		String postUrl,
 		String title,
 		OffsetDateTime postDate,
-		String thumbnailUrl
+		String thumbnailUrl,
+		int scrollBatch
 ) {
 }

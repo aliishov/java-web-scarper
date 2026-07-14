@@ -29,14 +29,34 @@ public final class BakuWsScraperSupport {
 	}
 
 	public static String normalizePostUrl(String url) {
-		return UrlNormalizer.removeTrackingParams(UrlNormalizer.resolve(BASE_URL, url));
+		if (url == null || url.isBlank()) {
+			return null;
+		}
+		String normalizedUrl;
+		try {
+			normalizedUrl = removeFragment(UrlNormalizer.removeTrackingParams(UrlNormalizer.resolve(BASE_URL, url)));
+		} catch (IllegalArgumentException exception) {
+			return null;
+		}
+		return isPostUrl(normalizedUrl) ? normalizedUrl : null;
 	}
 
 	public static Optional<String> extractExternalPostId(String postUrl) {
+		return extractExternalPostId(null, postUrl);
+	}
+
+	public static Optional<String> extractExternalPostId(String dataPage, String postUrl) {
+		if (dataPage != null && dataPage.trim().matches("\\d+")) {
+			return Optional.of(dataPage.trim());
+		}
 		if (postUrl == null || postUrl.isBlank()) {
 			return Optional.empty();
 		}
-		URI uri = URI.create(postUrl.trim());
+		String normalizedUrl = normalizePostUrl(postUrl);
+		if (normalizedUrl == null) {
+			return Optional.empty();
+		}
+		URI uri = URI.create(normalizedUrl);
 		String path = uri.getPath();
 		if (path == null || path.isBlank() || "/".equals(path)) {
 			return Optional.empty();
@@ -45,6 +65,48 @@ public final class BakuWsScraperSupport {
 		int lastSlashIndex = normalizedPath.lastIndexOf('/');
 		String lastSegment = lastSlashIndex >= 0 ? normalizedPath.substring(lastSlashIndex + 1) : normalizedPath;
 		return lastSegment.isBlank() ? Optional.empty() : Optional.of(lastSegment);
+	}
+
+	public static boolean isPostUrl(String url) {
+		if (url == null || url.isBlank() || isBlockedUrl(url)) {
+			return false;
+		}
+		URI uri;
+		try {
+			uri = URI.create(url.trim());
+		} catch (IllegalArgumentException exception) {
+			return false;
+		}
+		String host = uri.getHost();
+		String path = uri.getPath();
+		if (host == null || path == null || path.isBlank() || "/".equals(path)) {
+			return false;
+		}
+		String normalizedHost = host.toLowerCase(Locale.ROOT);
+		if (!normalizedHost.equals("baku.ws") && !normalizedHost.endsWith(".baku.ws")) {
+			return false;
+		}
+		String normalizedPath = path.toLowerCase(Locale.ROOT);
+		if (normalizedPath.equals("/search")
+				|| normalizedPath.startsWith("/search/")
+				|| normalizedPath.equals("/tag")
+				|| normalizedPath.startsWith("/tag/")
+				|| normalizedPath.startsWith("/storage/")
+				|| normalizedPath.startsWith("/images/")
+				|| normalizedPath.startsWith("/assets/")) {
+			return false;
+		}
+		if (normalizedPath.matches(".*\\.(webp|png|jpe?g|gif|svg|mp4|webm|mp3|pdf)$")) {
+			return false;
+		}
+		String[] segments = normalizedPath.split("/");
+		int nonBlankSegments = 0;
+		for (String segment : segments) {
+			if (!segment.isBlank()) {
+				nonBlankSegments++;
+			}
+		}
+		return nonBlankSegments >= 2;
 	}
 
 	public static boolean isAllowedMediaUrl(String mediaUrl) {
@@ -82,5 +144,23 @@ public final class BakuWsScraperSupport {
 			case "source" -> "picture".equals(parent) ? MediaType.IMAGE : MediaType.VIDEO;
 			default -> MediaType.UNKNOWN;
 		};
+	}
+
+	private static boolean isBlockedUrl(String url) {
+		String normalized = url.toLowerCase(Locale.ROOT);
+		return normalized.startsWith("mailto:")
+				|| normalized.startsWith("javascript:")
+				|| normalized.contains("yandex")
+				|| normalized.contains("telegram")
+				|| normalized.contains("facebook")
+				|| normalized.contains("whatsapp")
+				|| normalized.contains("/images/banners/")
+				|| normalized.contains("placeholder_home")
+				|| normalized.contains("banner");
+	}
+
+	private static String removeFragment(String url) {
+		int fragmentIndex = url.indexOf('#');
+		return fragmentIndex < 0 ? url : url.substring(0, fragmentIndex);
 	}
 }

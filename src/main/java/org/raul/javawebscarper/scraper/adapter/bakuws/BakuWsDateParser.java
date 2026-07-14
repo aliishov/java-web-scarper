@@ -147,6 +147,8 @@ public class BakuWsDateParser {
 				.replace("É™", "e")
 				.replace("ə", "e")
 				.replace("Ə", "e")
+				.replace("\u00fc", "u")
+				.replace("\u0259", "e")
 				.replaceAll("\\s+", " ");
 	}
 }
