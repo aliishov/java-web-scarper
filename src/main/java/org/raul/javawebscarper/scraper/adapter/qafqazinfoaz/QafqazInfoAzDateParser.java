@@ -1,6 +1,7 @@
 package org.raul.javawebscarper.scraper.adapter.qafqazinfoaz;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +34,7 @@ public class QafqazInfoAzDateParser {
 
 	private final ZoneId zoneId;
 
+	@Autowired
 	public QafqazInfoAzDateParser(@Value("${scraper.default-time-zone:Asia/Baku}") String zoneId) {
 		this(ZoneId.of(zoneId));
 	}
