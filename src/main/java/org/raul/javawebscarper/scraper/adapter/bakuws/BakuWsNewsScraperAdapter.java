@@ -231,7 +231,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		Set<String> seenUrls = new LinkedHashSet<>();
 
 		for (int scroll = 0; scroll < context.maxPages() && cardsByUrl.size() < context.maxPosts(); scroll++) {
-			CardCollectionStats stats = collectCurrentCards(page, context, cardsByUrl, seenUrls);
+			CardCollectionStats stats = collectCurrentCards(page, context, cardsByUrl, seenUrls, scroll + 1);
 			log.info(
 					"baku.ws search cards pass={}: found={}, added={}, duplicateCards={}, "
 							+ "skippedAds={}, skippedMissingUrl={}, skippedDateParse={}, beforeRange={}, afterRange={}",
@@ -268,7 +268,8 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			BrowserPage page,
 			ScraperExecutionContext context,
 			Map<String, BakuWsSearchResultCard> cardsByUrl,
-			Set<String> seenUrls
+			Set<String> seenUrls,
+			int scrollBatch
 	) {
 		Document document = Jsoup.parse(page.content(), BakuWsScraperSupport.BASE_URL);
 		Elements elements = document.select(BakuWsSelectors.RESULT_CARD);
@@ -286,7 +287,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		int newDatedCards = 0;
 
 		for (Element element : elements) {
-			CardParseResult parsedCard = parseResultCard(element);
+			CardParseResult parsedCard = parseResultCard(element, scrollBatch);
 			if (parsedCard.card() == null) {
 				switch (parsedCard.skipReason()) {
 					case AD -> skippedAds++;
@@ -330,7 +331,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		);
 	}
 
-	CardParseResult parseResultCard(Element element) {
+	CardParseResult parseResultCard(Element element, int scrollBatch) {
 		if (isAdCard(element)) {
 			return CardParseResult.skipped(CardSkipReason.AD);
 		}
@@ -372,7 +373,8 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 				normalizedUrl,
 				text(element, BakuWsSelectors.RESULT_CARD_TITLE),
 				postDate.get(),
-				thumbnailUrl
+				thumbnailUrl,
+				scrollBatch
 		));
 	}
 
@@ -392,6 +394,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 	) {
 		List<ScrapedPostDTO> posts = new ArrayList<>();
 		Set<String> seenExternalIds = new LinkedHashSet<>();
+		Set<String> seenPostUrls = new LinkedHashSet<>();
 		int articlesOpened = 0;
 		int skippedEmptyText = 0;
 		int skippedOutOfRange = 0;
@@ -413,11 +416,15 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 					}
 					continue;
 				}
-				if (seenExternalIds.add(attempt.post().externalPostId())) {
+				if (seenExternalIds.add(attempt.post().externalPostId()) && seenPostUrls.add(attempt.post().postUrl())) {
 					posts.add(attempt.post());
 				} else {
 					duplicates++;
-					log.debug("Skipping duplicate baku.ws article by externalPostId={}", attempt.post().externalPostId());
+					log.debug(
+							"Skipping duplicate baku.ws article: externalPostId={}, postUrl={}",
+							attempt.post().externalPostId(),
+							attempt.post().postUrl()
+					);
 				}
 			} catch (RuntimeException exception) {
 				skippedErrors++;
@@ -472,7 +479,10 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 			return ArticleCollectionAttempt.skipped(ArticleSkipReason.EMPTY_TEXT);
 		}
 
-		String externalPostId = BakuWsScraperSupport.extractExternalPostId(card.postUrl())
+		String dataPage = Optional.ofNullable(document.selectFirst(BakuWsSelectors.ARTICLE_DATA_PAGE))
+				.map(element -> firstNonBlank(element.attr("data-page")))
+				.orElse(null);
+		String externalPostId = BakuWsScraperSupport.extractExternalPostId(dataPage, card.postUrl())
 				.orElseGet(() -> Integer.toHexString(card.postUrl().hashCode()));
 		List<ScrapedMediaDTO> media = extractMedia(document, card);
 		Map<String, Object> metadata = metadata(context, card);
@@ -697,6 +707,7 @@ public class BakuWsNewsScraperAdapter implements NewsScraperAdapter {
 		if (card.thumbnailUrl() != null && !card.thumbnailUrl().isBlank()) {
 			metadata.put("thumbnailUrl", card.thumbnailUrl());
 		}
+		metadata.put("scrollBatch", card.scrollBatch());
 		return metadata;
 	}
 

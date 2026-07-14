@@ -218,7 +218,8 @@ class BakuWsNewsScraperAdapterTests {
 				"https://baku.ws/incident/example",
 				"Example title",
 				OffsetDateTime.parse("2026-07-07T11:45:00+04:00"),
-				"https://baku.ws/storage/photos/thumbnail.webp"
+				"https://baku.ws/storage/photos/thumbnail.webp",
+				2
 		);
 	}
 }
