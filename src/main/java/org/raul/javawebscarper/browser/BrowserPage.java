@@ -123,6 +123,15 @@ public class BrowserPage implements AutoCloseable {
 		});
 	}
 
+	public void scrollBy(int pixels, long delayMs) {
+		execute("scrollBy", () -> {
+			log.debug("Scrolling page by {}px with delay {}ms", pixels, delayMs);
+			page.evaluate("amount => window.scrollBy({ top: amount, behavior: 'smooth' })", pixels);
+			page.waitForTimeout(delayMs);
+			return null;
+		});
+	}
+
 	public void screenshot(String path) {
 		Objects.requireNonNull(path, "Screenshot path must not be null");
 		execute("screenshot", () -> {
