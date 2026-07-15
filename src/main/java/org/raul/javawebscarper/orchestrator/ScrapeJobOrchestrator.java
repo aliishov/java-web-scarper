@@ -18,6 +18,7 @@ import org.raul.javawebscarper.service.KeywordService;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.raul.javawebscarper.service.SourceLanguageSupportService;
 import org.raul.javawebscarper.service.SourceService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -237,6 +238,19 @@ public class ScrapeJobOrchestrator {
 		try {
 			job = scrapeJobService.createPendingJob(source, keyword, dateFrom, dateTo, runType);
 			counters.jobsCreated++;
+		} catch (DataIntegrityViolationException exception) {
+			counters.jobsSkipped++;
+			log.info(
+					"Skipping scrape job after duplicate creation conflict: source={}, keyword={}, dateFrom={}, "
+							+ "dateTo={}, runType={}",
+					source.getCode(),
+					keyword.getWord(),
+					dateFrom,
+					dateTo,
+					runType
+			);
+			log.debug("Duplicate scrape job creation conflict details", exception);
+			return;
 		} catch (Exception exception) {
 			counters.jobsSkipped++;
 			log.error(
