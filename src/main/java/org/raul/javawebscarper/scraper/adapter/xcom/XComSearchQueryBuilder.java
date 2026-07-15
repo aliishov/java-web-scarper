@@ -1,5 +1,6 @@
 package org.raul.javawebscarper.scraper.adapter.xcom;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,7 @@ public class XComSearchQueryBuilder {
 
 	private final ZoneId zoneId;
 
+	@Autowired
 	public XComSearchQueryBuilder(@Value("${scraper.default-time-zone:Asia/Baku}") String zoneId) {
 		this.zoneId = ZoneId.of(zoneId);
 	}
