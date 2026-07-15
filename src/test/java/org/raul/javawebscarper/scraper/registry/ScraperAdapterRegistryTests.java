@@ -28,6 +28,7 @@ import org.raul.javawebscarper.scraper.adapter.onenews.OneNewsAzScraperAdapter;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ScraperAdapterRegistryTests {
 
@@ -52,6 +53,20 @@ class ScraperAdapterRegistryTests {
 
 		assertThat(registry.findAdapter(source)).isEmpty();
 		assertThat(registry.getAdapter(source)).isSameAs(unsupportedAdapter);
+	}
+
+	@Test
+	void rejectsDuplicateAdapterSourceCodes() {
+		ScraperAdapter firstAdapter = new TestScraperAdapter("BAKU_WS");
+		ScraperAdapter secondAdapter = new TestScraperAdapter("baku_ws");
+
+		assertThatThrownBy(() -> new ScraperAdapterRegistry(
+				List.of(firstAdapter, secondAdapter, unsupportedAdapter),
+				unsupportedAdapter
+		))
+				.isInstanceOf(IllegalStateException.class)
+				.hasMessageContaining("Duplicate scraper adapter source codes")
+				.hasMessageContaining("BAKU_WS");
 	}
 
 	@Test
