@@ -38,6 +38,9 @@ out/
 
 /resources/
 docs/
+logs/
+screenshots/
+debug-html/
 .env
 .env.*
 !.env.example
