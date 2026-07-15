@@ -83,10 +83,10 @@ public class Post extends BaseEntity {
 	@Column(name = "scraped_at", nullable = false)
 	OffsetDateTime scrapedAt;
 
-	@Column(name = "text", nullable = false, columnDefinition = "TEXT")
+	@Column(name = "text", columnDefinition = "TEXT")
 	String text;
 
-	@Column(name = "text_hash", nullable = false, length = 128)
+	@Column(name = "text_hash", length = 128)
 	String textHash;
 
 	@Column(name = "language", length = 16)
