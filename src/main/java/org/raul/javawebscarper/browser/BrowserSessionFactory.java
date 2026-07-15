@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 
 @Slf4j
@@ -31,7 +33,9 @@ public class BrowserSessionFactory {
 					.setViewportSize(properties.getViewportWidth(), properties.getViewportHeight())
 					.setUserAgent(firstNonBlank(safeOptions.userAgent(), properties.getUserAgent()));
 			if (safeOptions.storageStatePath() != null) {
-				contextOptions.setStorageStatePath(safeOptions.storageStatePath());
+				Path storageStatePath = validateStorageStatePath(safeOptions.storageStatePath());
+				log.info("Using configured storage state for authenticated browser session");
+				contextOptions.setStorageStatePath(storageStatePath);
 			}
 			if (safeOptions.locale() != null && !safeOptions.locale().isBlank()) {
 				contextOptions.setLocale(safeOptions.locale());
@@ -65,6 +69,13 @@ public class BrowserSessionFactory {
 
 	private String firstNonBlank(String first, String second) {
 		return first == null || first.isBlank() ? second : first;
+	}
+
+	private Path validateStorageStatePath(Path storageStatePath) {
+		if (!Files.isRegularFile(storageStatePath)) {
+			throw new BrowserEngineException("Configured browser storage state file does not exist");
+		}
+		return storageStatePath;
 	}
 
 	private void closeContextQuietly(BrowserContext context) {

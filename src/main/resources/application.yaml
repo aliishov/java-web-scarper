@@ -85,6 +85,9 @@ scraper:
     enabled: ${SCRAPER_X_ENABLED:true}
     base-url: ${SCRAPER_X_BASE_URL:https://x.com}
     auth-state-path: ${X_AUTH_STATE_PATH:}
+    login-url: ${SCRAPER_X_LOGIN_URL:https://x.com/i/flow/login}
+    login-timeout-ms: ${SCRAPER_X_LOGIN_TIMEOUT_MS:60000}
+    authentication-required: ${SCRAPER_X_AUTHENTICATION_REQUIRED:true}
     search-mode: ${SCRAPER_X_SEARCH_MODE:LATEST}
     include-retweets: ${SCRAPER_X_INCLUDE_RETWEETS:true}
     include-replies: ${SCRAPER_X_INCLUDE_REPLIES:true}
