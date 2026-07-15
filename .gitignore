@@ -38,6 +38,12 @@ out/
 
 /resources/
 docs/
+.env
+.env.*
+!.env.example
 playwright/.auth/
 auth-state*.json
 x-storage-state*.json
+**/auth-state*.json
+**/storage-state*.json
+**/x-auth*.json

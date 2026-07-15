@@ -24,7 +24,6 @@ import org.raul.javawebscarper.scraper.support.DateRangeValidator;
 import org.raul.javawebscarper.scraper.support.UrlNormalizer;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -49,6 +48,7 @@ public class XComScraperAdapter implements ScraperAdapter {
 	private final XComProperties properties;
 	private final XComSearchQueryBuilder queryBuilder;
 	private final XComDateParser dateParser;
+	private final XAuthenticationVerifier authenticationVerifier;
 
 	@Override
 	public String sourceCode() {
@@ -99,6 +99,13 @@ public class XComScraperAdapter implements ScraperAdapter {
 
 		try (BrowserSession session = browserSessionFactory.createSession(sessionOptions)) {
 			BrowserPage page = session.newPage();
+			if (properties.isAuthenticationRequired()) {
+				XAuthenticationStatus authenticationStatus = verifyAuthenticatedSession(page);
+				if (authenticationStatus != XAuthenticationStatus.AUTHENTICATED) {
+					incrementAuthenticationDiagnostic(authenticationStatus, diagnostics);
+					return failed(authenticationFailureMessage(authenticationStatus), diagnostics);
+				}
+			}
 			page.navigate(searchUrl);
 			page.waitForSelector("body", 15_000);
 			page.waitForTimeout(1_500);
@@ -149,14 +156,43 @@ public class XComScraperAdapter implements ScraperAdapter {
 	private BrowserSessionOptions sessionOptions(XScrapeDiagnostics diagnostics) {
 		String authStatePath = properties.getAuthStatePath();
 		if (authStatePath == null || authStatePath.isBlank()) {
+			if (properties.isAuthenticationRequired()) {
+				throw new BrowserEngineException("X authentication state is missing or expired. Regenerate it with the xAuthState Gradle task.");
+			}
 			return BrowserSessionOptions.defaults();
 		}
 		Path path = Path.of(authStatePath.trim());
-		if (!Files.isRegularFile(path)) {
-			throw new BrowserEngineException("AUTH_STATE_EXPIRED: X auth state file does not exist: " + path);
-		}
 		diagnostics.authStateUsed = true;
 		return BrowserSessionOptions.withStorageState(path);
+	}
+
+	private XAuthenticationStatus verifyAuthenticatedSession(BrowserPage page) {
+		page.navigate(homeUrl());
+		page.waitForSelector("body", properties.getLoginTimeoutMs());
+		page.waitForTimeout(1_000);
+		return authenticationVerifier.verify(page);
+	}
+
+	private String homeUrl() {
+		String baseUrl = properties.getBaseUrl() == null || properties.getBaseUrl().isBlank()
+				? XComScraperSupport.BASE_URL
+				: properties.getBaseUrl().trim();
+		String normalized = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+		return normalized + "/home";
+	}
+
+	private String authenticationFailureMessage(XAuthenticationStatus status) {
+		return switch (status) {
+			case AUTH_STATE_EXPIRED, AUTH_REQUIRED ->
+					"AUTH_STATE_EXPIRED: X authentication state is missing or expired. Regenerate it with the xAuthState Gradle task.";
+			case CHALLENGE_REQUIRED ->
+					"CHALLENGE_REQUIRED: Complete the X verification step in the opened browser and regenerate authentication state.";
+			case RATE_LIMITED ->
+					"RATE_LIMITED: X temporarily limited authenticated access. Retry later with the existing authentication state.";
+			case UNKNOWN ->
+					"AUTH_STATE_UNKNOWN: X authentication state could not be verified. Regenerate it with the xAuthState Gradle task.";
+			case AUTHENTICATED -> "AUTHENTICATED";
+		};
 	}
 
 	private boolean confirmLatestMode(BrowserPage page) {
@@ -467,6 +503,15 @@ public class XComScraperAdapter implements ScraperAdapter {
 	private void incrementFailureDiagnostic(FailureState failureState, XScrapeDiagnostics diagnostics) {
 		switch (failureState) {
 			case AUTH_REQUIRED, AUTH_STATE_EXPIRED -> diagnostics.loginWallDetected++;
+			case RATE_LIMITED -> diagnostics.rateLimitDetected++;
+			default -> {
+			}
+		}
+	}
+
+	private void incrementAuthenticationDiagnostic(XAuthenticationStatus status, XScrapeDiagnostics diagnostics) {
+		switch (status) {
+			case AUTH_REQUIRED, AUTH_STATE_EXPIRED, CHALLENGE_REQUIRED, UNKNOWN -> diagnostics.loginWallDetected++;
 			case RATE_LIMITED -> diagnostics.rateLimitDetected++;
 			default -> {
 			}

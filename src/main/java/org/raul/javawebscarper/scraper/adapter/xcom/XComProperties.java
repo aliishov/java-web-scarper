@@ -19,6 +19,11 @@ public class XComProperties {
 	private String baseUrl = "https://x.com";
 	@Size(max = 1024)
 	private String authStatePath = "";
+	@Size(max = 256)
+	private String loginUrl = "https://x.com/i/flow/login";
+	@Positive
+	private long loginTimeoutMs = 60_000;
+	private boolean authenticationRequired = true;
 	private XSearchMode searchMode = XSearchMode.LATEST;
 	private boolean includeRetweets = true;
 	private boolean includeReplies = true;

@@ -1,72 +1,99 @@
 # X Authentication Setup
 
-The X scraper does not store credentials and does not perform username/password login in application code.
-If X requires an authenticated browser session, provide a Playwright storage-state JSON file through configuration.
+The X scraper uses a reusable Playwright storage-state file. It must not keep usernames, emails, passwords, cookies, tokens, or storage-state JSON in Java code, YAML, tests, docs, logs, Gradle files, or Git history.
 
-## Configuration
+If a password was shared in chat or logs, rotate it before creating a storage state.
 
-Use one of these options:
+## Runtime Configuration
 
-- Environment variable: `X_AUTH_STATE_PATH`
-- YAML property: `scraper.x.auth-state-path`
-
-Example local value:
+The application reads only the storage-state path:
 
 ```yaml
 scraper:
   x:
     auth-state-path: ${X_AUTH_STATE_PATH:}
+    authentication-required: true
 ```
 
-Recommended local path:
-
-```text
-playwright/.auth/x-storage-state.json
-```
-
-The project ignores the following auth-state files:
-
-- `playwright/.auth/`
-- `auth-state*.json`
-- `x-storage-state*.json`
-
-Never commit cookies, local storage, screenshots, HTML dumps, passwords, or MFA recovery data.
+Runtime scraping does not perform username/password login. If `authentication-required=true` and `X_AUTH_STATE_PATH` is missing, invalid, expired, or redirected to login, the X job fails with an auth-specific error and asks you to regenerate the state.
 
 ## Creating Storage State
 
-Create the storage state outside the application by opening X in a Playwright-controlled browser, signing in manually, and saving the browser context state.
-Keep the resulting JSON file on the local machine or in a secure runtime secret store.
-
-Minimal standalone Playwright Java flow:
-
-```java
-try (Playwright playwright = Playwright.create()) {
-    Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
-    BrowserContext context = browser.newContext();
-    Page page = context.newPage();
-    page.navigate("https://x.com/");
-    // Sign in manually, including MFA if required.
-    context.storageState(new BrowserContext.StorageStateOptions()
-            .setPath(Paths.get("playwright/.auth/x-storage-state.json")));
-}
-```
-
-After saving the file, run the backend with:
+Preferred local flow:
 
 ```powershell
-$env:X_AUTH_STATE_PATH="playwright/.auth/x-storage-state.json"
+$env:X_LOGIN = "your-username-or-email"
+$env:X_USERNAME = "your-username"
+$env:X_AUTH_STATE_PATH = "playwright/.auth/x-storage-state.json"
+
+.\gradlew.bat xAuthState
 ```
 
-## Runtime Behavior
+The utility reads the password interactively when a console is available. If there is no interactive console, set `X_PASSWORD` only for the child process session and remove it immediately after use:
 
-- If `scraper.x.auth-state-path` is blank, the scraper starts an anonymous browser session.
-- If the configured file does not exist, the X scraper returns `FAILED` with an `AUTH_STATE_EXPIRED` message.
-- If X shows a login wall, rate limit, or timeline error page, the scraper returns `FAILED`.
-- Authenticated sessions can expire at any time; refresh the storage-state file when jobs start failing with login/auth messages.
+```powershell
+$env:X_PASSWORD = Read-Host "Enter X password"
+.\gradlew.bat xAuthState
+Remove-Item Env:X_PASSWORD
+```
+
+Clean up non-secret identifiers from the shell when done:
+
+```powershell
+Remove-Item Env:X_LOGIN
+Remove-Item Env:X_USERNAME
+```
+
+The utility prints only safe status messages. It must not print credentials, cookies, tokens, or storage-state JSON.
+
+## Interactive Fallback
+
+If automated form filling triggers a challenge, use the manual headed-browser flow:
+
+```powershell
+$env:X_AUTH_STATE_PATH = "playwright/.auth/x-storage-state.json"
+.\gradlew.bat xAuthStateInteractive
+```
+
+Sign in manually in the opened browser. Complete MFA, email verification, CAPTCHA, or other security prompts yourself. The utility waits for an authenticated page and saves state only after authentication is confirmed.
+
+## Running The App
+
+```powershell
+$env:X_AUTH_STATE_PATH = "playwright/.auth/x-storage-state.json"
+.\gradlew.bat bootRun
+```
+
+For Docker Compose, pass `X_AUTH_STATE_PATH` through the environment and mount/provide the file securely. Do not bake storage-state files into the image.
+
+## Refreshing Expired State
+
+Regenerate state when scraping returns one of these messages:
+
+- `AUTH_STATE_EXPIRED`
+- `AUTH_REQUIRED`
+- `CHALLENGE_REQUIRED`
+
+Use either `xAuthState` or `xAuthStateInteractive`, depending on whether X allows automated form filling.
+
+## Ignored Files
+
+The project ignores local auth artifacts:
+
+- `.env`
+- `.env.*`
+- `playwright/.auth/`
+- `auth-state*.json`
+- `x-storage-state*.json`
+- `**/auth-state*.json`
+- `**/storage-state*.json`
+- `**/x-auth*.json`
+
+Only `.env.example` may be committed, and it must not contain real credentials or passwords.
 
 ## Operational Notes
 
 - Use a dedicated scraping account and follow X platform rules and rate limits.
-- Rotate or delete storage-state files when access is no longer needed.
-- Do not share auth-state files in chat, pull requests, issue comments, logs, or test fixtures.
-- Keep live HTML/screenshot debugging artifacts outside the repository unless they are sanitized and explicitly required.
+- Never automate CAPTCHA or security challenge bypass.
+- Do not commit screenshots, HTML dumps, cookies, or storage-state files from authenticated sessions.
+- Do not include local absolute paths with personal usernames in public docs or reports.
