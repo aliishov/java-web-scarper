@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -17,12 +19,31 @@ public class BrowserSessionFactory {
 	private final BrowserEngineProperties properties;
 
 	public BrowserSession createSession() {
+		return createSession(BrowserSessionOptions.defaults());
+	}
+
+	public BrowserSession createSession(BrowserSessionOptions options) {
 		BrowserContext context = null;
 		try {
 			Browser browser = browserEngine.getBrowser();
-			context = browser.newContext(new Browser.NewContextOptions()
+			BrowserSessionOptions safeOptions = options == null ? BrowserSessionOptions.defaults() : options;
+			Browser.NewContextOptions contextOptions = new Browser.NewContextOptions()
 					.setViewportSize(properties.getViewportWidth(), properties.getViewportHeight())
-					.setUserAgent(properties.getUserAgent()));
+					.setUserAgent(firstNonBlank(safeOptions.userAgent(), properties.getUserAgent()));
+			if (safeOptions.storageStatePath() != null) {
+				contextOptions.setStorageStatePath(safeOptions.storageStatePath());
+			}
+			if (safeOptions.locale() != null && !safeOptions.locale().isBlank()) {
+				contextOptions.setLocale(safeOptions.locale());
+			}
+			if (safeOptions.timezoneId() != null && !safeOptions.timezoneId().isBlank()) {
+				contextOptions.setTimezoneId(safeOptions.timezoneId());
+			}
+			Map<String, String> extraHeaders = safeOptions.extraHttpHeaders();
+			if (extraHeaders != null && !extraHeaders.isEmpty()) {
+				contextOptions.setExtraHTTPHeaders(extraHeaders);
+			}
+			context = browser.newContext(contextOptions);
 			context.setDefaultTimeout(properties.getActionTimeoutMs());
 			context.setDefaultNavigationTimeout(properties.getNavigationTimeoutMs());
 
@@ -40,6 +61,10 @@ public class BrowserSessionFactory {
 			closeContextQuietly(context);
 			throw new BrowserEngineException("Failed to create browser session", exception);
 		}
+	}
+
+	private String firstNonBlank(String first, String second) {
+		return first == null || first.isBlank() ? second : first;
 	}
 
 	private void closeContextQuietly(BrowserContext context) {

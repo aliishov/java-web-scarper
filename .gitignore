@@ -38,3 +38,6 @@ out/
 
 /resources/
 docs/
+playwright/.auth/
+auth-state*.json
+x-storage-state*.json
