@@ -222,4 +222,17 @@ class SourceLanguageSupportServiceTests {
 
 		assertThat(service.isSupported(source, keyword)).isFalse();
 	}
+
+	@Test
+	void xComSupportsAllConfiguredKeywordLanguages() {
+		Source source = Source.builder()
+				.code("X_COM")
+				.supportedLanguages(EnumSet.allOf(Language.class))
+				.build();
+
+		assertThat(service.isSupported(source, Keyword.builder().word("mehkeme").language(Language.AZ).build())).isTrue();
+		assertThat(service.isSupported(source, Keyword.builder().word("sud").language(Language.RU).build())).isTrue();
+		assertThat(service.isSupported(source, Keyword.builder().word("court").language(Language.EN).build())).isTrue();
+		assertThat(service.isSupported(source, Keyword.builder().word("mahkeme").language(Language.TR).build())).isTrue();
+	}
 }

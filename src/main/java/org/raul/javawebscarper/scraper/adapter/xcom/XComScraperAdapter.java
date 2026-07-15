@@ -78,7 +78,14 @@ public class XComScraperAdapter implements ScraperAdapter {
 				properties.getSearchMode()
 		);
 		XScrapeDiagnostics diagnostics = new XScrapeDiagnostics();
-		BrowserSessionOptions sessionOptions = sessionOptions(diagnostics);
+		BrowserSessionOptions sessionOptions;
+		try {
+			sessionOptions = sessionOptions(diagnostics);
+		} catch (BrowserEngineException exception) {
+			log.warn("X auth state is not usable: {}", exception.getMessage());
+			diagnostics.loginWallDetected++;
+			return failed("AUTH_STATE_EXPIRED: " + exception.getMessage(), diagnostics);
+		}
 		log.info(
 				"Starting X scraping: keyword={}, dateFrom={}, dateTo={}, mode={}, authStateUsed={}, maxScrollAttempts={}, maxPosts={}",
 				keyword,
@@ -330,7 +337,7 @@ public class XComScraperAdapter implements ScraperAdapter {
 		String displayName = displayName(userElement, username);
 		String avatar = Optional.ofNullable(article.selectFirst(XComSelectors.AVATAR))
 				.map(image -> firstNonBlank(image.attr("src"), image.attr("data-src")))
-				.filter(XComScraperSupport::isAllowedMediaUrl)
+				.filter(XComScraperSupport::isAllowedAvatarUrl)
 				.orElse(null);
 		return new ScrapedAuthorDTO(
 				username,
@@ -438,15 +445,20 @@ public class XComScraperAdapter implements ScraperAdapter {
 	}
 
 	private FailureState detectFailureState(String html, String url) {
-		String normalized = normalizeText((url == null ? "" : url) + " " + (html == null ? "" : Jsoup.parse(html).text()));
-		if (normalized.contains("/login") || normalized.contains("/i/flow/login") || normalized.contains("sign in")
-				|| normalized.contains("log in") || normalized.contains("create account")) {
+		Document document = Jsoup.parse(html == null ? "" : html);
+		boolean hasTweetArticles = !document.select(XComSelectors.TWEET_ARTICLE).isEmpty();
+		boolean hasLoginControl = document.selectFirst(XComSelectors.LOGIN_INPUT + ", " + XComSelectors.LOGIN_BUTTON) != null;
+		String normalizedUrl = url == null ? "" : url.toLowerCase(Locale.ROOT);
+		String normalizedText = normalizeText(document.text()).toLowerCase(Locale.ROOT);
+		if (normalizedUrl.contains("/login") || normalizedUrl.contains("/i/flow/login") || hasLoginControl
+				|| (!hasTweetArticles && (normalizedText.contains("sign in")
+				|| normalizedText.contains("log in") || normalizedText.contains("create account")))) {
 			return FailureState.AUTH_REQUIRED;
 		}
-		if (normalized.contains("rate limit") || normalized.contains("too many requests")) {
+		if (normalizedText.contains("rate limit") || normalizedText.contains("too many requests")) {
 			return FailureState.RATE_LIMITED;
 		}
-		if (normalized.contains("something went wrong") || normalized.contains("try again")) {
+		if (normalizedText.contains("something went wrong") || normalizedText.contains("try again")) {
 			return FailureState.SEARCH_UNAVAILABLE;
 		}
 		return FailureState.NONE;

@@ -15,6 +15,10 @@ import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzSearchPeriodResolver;
 import org.raul.javawebscarper.scraper.adapter.qafqazinfoaz.QafqazInfoAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.qafqazinfoaz.QafqazInfoAzNewsScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.xcom.XComDateParser;
+import org.raul.javawebscarper.scraper.adapter.xcom.XComProperties;
+import org.raul.javawebscarper.scraper.adapter.xcom.XComScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.xcom.XComSearchQueryBuilder;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
 import org.raul.javawebscarper.scraper.adapter.onenews.OneNewsAzDateParser;
@@ -134,6 +138,24 @@ class ScraperAdapterRegistryTests {
 		assertThat(registry.findAdapter(source)).contains(lentAdapter);
 		assertThat(registry.getAdapter(source)).isSameAs(lentAdapter);
 		assertThat(registry.getRegisteredSourceCodes()).contains("LENT_AZ");
+	}
+
+	@Test
+	void findsXComAdapterByCurrentAndLegacySourceCodes() {
+		XComScraperAdapter xAdapter = new XComScraperAdapter(
+				null,
+				new XComProperties(),
+				new XComSearchQueryBuilder("Asia/Baku"),
+				new XComDateParser()
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(xAdapter, unsupportedAdapter), unsupportedAdapter);
+
+		assertThat(registry.findAdapter(Source.builder().code("X_COM").build())).contains(xAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("TWITTER").build())).contains(xAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("TWITTER_X").build())).contains(xAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("X").build())).contains(xAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("social").baseUrl("https://twitter.com/").build())).contains(xAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("X_COM");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {

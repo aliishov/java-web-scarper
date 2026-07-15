@@ -87,6 +87,17 @@ public final class XComScraperSupport {
 				&& !normalized.contains("pbs.twimg.com/profile_images");
 	}
 
+	public static boolean isAllowedAvatarUrl(String avatarUrl) {
+		if (avatarUrl == null || avatarUrl.isBlank()) {
+			return false;
+		}
+		String normalized = avatarUrl.toLowerCase(Locale.ROOT);
+		return !normalized.startsWith("blob:")
+				&& !normalized.startsWith("data:")
+				&& !normalized.contains("emoji")
+				&& !normalized.contains("abs.twimg.com");
+	}
+
 	public static String normalizeLanguage(String value, String fallback) {
 		String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
 		if (SUPPORTED_LANGUAGES.contains(normalized)) {
