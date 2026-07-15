@@ -51,3 +51,20 @@ tasks.register('playwrightInstall', JavaExec) {
     mainClass = 'com.microsoft.playwright.CLI'
     args 'install', 'chromium'
 }
+
+tasks.register('xAuthState', JavaExec) {
+    group = 'playwright'
+    description = 'Creates a reusable X Playwright storage state from environment credentials.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.raul.javawebscarper.tools.xauth.XAuthStateGenerator'
+    standardInput = System.in
+}
+
+tasks.register('xAuthStateInteractive', JavaExec) {
+    group = 'playwright'
+    description = 'Opens X login in headed Chromium and saves storage state after manual authentication.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.raul.javawebscarper.tools.xauth.XAuthStateGenerator'
+    args '--interactive-only'
+    standardInput = System.in
+}

@@ -27,13 +27,15 @@ public class BrowserSessionFactory {
 	public BrowserSession createSession(BrowserSessionOptions options) {
 		BrowserContext context = null;
 		try {
-			Browser browser = browserEngine.getBrowser();
 			BrowserSessionOptions safeOptions = options == null ? BrowserSessionOptions.defaults() : options;
+			Path storageStatePath = safeOptions.storageStatePath() == null
+					? null
+					: validateStorageStatePath(safeOptions.storageStatePath());
+			Browser browser = browserEngine.getBrowser();
 			Browser.NewContextOptions contextOptions = new Browser.NewContextOptions()
 					.setViewportSize(properties.getViewportWidth(), properties.getViewportHeight())
 					.setUserAgent(firstNonBlank(safeOptions.userAgent(), properties.getUserAgent()));
-			if (safeOptions.storageStatePath() != null) {
-				Path storageStatePath = validateStorageStatePath(safeOptions.storageStatePath());
+			if (storageStatePath != null) {
 				log.info("Using configured storage state for authenticated browser session");
 				contextOptions.setStorageStatePath(storageStatePath);
 			}

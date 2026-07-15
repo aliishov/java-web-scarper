@@ -5,7 +5,7 @@ import org.jsoup.nodes.Document;
 
 import java.util.Locale;
 
-final class XAuthenticationPageInspector {
+public final class XAuthenticationPageInspector {
 
 	private static final String AUTHENTICATED_NAVIGATION = String.join(", ",
 			"a[href='/home']",
@@ -18,7 +18,7 @@ final class XAuthenticationPageInspector {
 	private XAuthenticationPageInspector() {
 	}
 
-	static XAuthenticationStatus inspect(String url, String html) {
+	public static XAuthenticationStatus inspect(String url, String html) {
 		Document document = Jsoup.parse(html == null ? "" : html);
 		String normalizedUrl = normalize(url);
 		String normalizedText = normalize(document.text());
@@ -44,7 +44,7 @@ final class XAuthenticationPageInspector {
 		return XAuthenticationStatus.UNKNOWN;
 	}
 
-	static boolean isAuthenticated(String url, String html) {
+	public static boolean isAuthenticated(String url, String html) {
 		return inspect(url, html) == XAuthenticationStatus.AUTHENTICATED;
 	}
 
