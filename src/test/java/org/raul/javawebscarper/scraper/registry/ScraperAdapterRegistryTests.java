@@ -17,6 +17,7 @@ import org.raul.javawebscarper.scraper.adapter.qafqazinfoaz.QafqazInfoAzDatePars
 import org.raul.javawebscarper.scraper.adapter.qafqazinfoaz.QafqazInfoAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.xcom.XComDateParser;
 import org.raul.javawebscarper.scraper.adapter.xcom.XComProperties;
+import org.raul.javawebscarper.scraper.adapter.xcom.XAuthenticationVerifier;
 import org.raul.javawebscarper.scraper.adapter.xcom.XComScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.xcom.XComSearchQueryBuilder;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
@@ -146,7 +147,8 @@ class ScraperAdapterRegistryTests {
 				null,
 				new XComProperties(),
 				new XComSearchQueryBuilder("Asia/Baku"),
-				new XComDateParser()
+				new XComDateParser(),
+				new XAuthenticationVerifier()
 		);
 		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(xAdapter, unsupportedAdapter), unsupportedAdapter);
 

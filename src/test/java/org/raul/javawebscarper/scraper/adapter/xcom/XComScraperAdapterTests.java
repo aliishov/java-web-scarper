@@ -26,7 +26,8 @@ class XComScraperAdapterTests {
 			null,
 			properties,
 			new XComSearchQueryBuilder(ZoneId.of("Asia/Baku")),
-			new XComDateParser()
+			new XComDateParser(),
+			new XAuthenticationVerifier()
 	);
 
 	@Test
