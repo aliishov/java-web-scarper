@@ -81,6 +81,19 @@ scraper:
     max-scroll-attempts: ${SCRAPER_BROWSER_MAX_SCROLL_ATTEMPTS:10}
     scroll-delay-ms: ${SCRAPER_BROWSER_SCROLL_DELAY_MS:1000}
     install-browsers-on-startup: ${SCRAPER_BROWSER_INSTALL_BROWSERS_ON_STARTUP:false}
+  x:
+    enabled: ${SCRAPER_X_ENABLED:true}
+    base-url: ${SCRAPER_X_BASE_URL:https://x.com}
+    auth-state-path: ${X_AUTH_STATE_PATH:}
+    search-mode: ${SCRAPER_X_SEARCH_MODE:LATEST}
+    include-retweets: ${SCRAPER_X_INCLUDE_RETWEETS:true}
+    include-replies: ${SCRAPER_X_INCLUDE_REPLIES:true}
+    include-promoted: ${SCRAPER_X_INCLUDE_PROMOTED:false}
+    max-scroll-attempts: ${SCRAPER_X_MAX_SCROLL_ATTEMPTS:30}
+    scroll-delay-ms: ${SCRAPER_X_SCROLL_DELAY_MS:1200}
+    no-new-post-limit: ${SCRAPER_X_NO_NEW_POST_LIMIT:3}
+    post-open-timeout-ms: ${SCRAPER_X_POST_OPEN_TIMEOUT_MS:15000}
+    prefer-latest-tab: ${SCRAPER_X_PREFER_LATEST_TAB:true}
 
 springdoc:
   api-docs:
