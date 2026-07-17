@@ -107,9 +107,7 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 					return failed(authenticationFailureMessage(authenticationStatus), diagnostics);
 				}
 			}
-			page.navigate(searchUrl);
-			page.waitForSelector("body", properties.getTimelineLoadTimeoutMs());
-			page.waitForTimeout(properties.getActionDelayMs());
+			openSearchPage(page, keyword.trim(), searchUrl);
 
 			TimelineCollectionResult result = collectTimeline(page, context, keyword.trim(), diagnostics);
 			log.info(
@@ -165,6 +163,30 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 		page.waitForSelector("body", properties.getAuthenticationTimeoutMs());
 		page.waitForTimeout(properties.getActionDelayMs());
 		return authenticationVerifier.verify(page);
+	}
+
+	private void openSearchPage(BrowserPage page, String keyword, String searchUrl) {
+		try {
+			page.navigate(homeUrl());
+			page.waitForSelector("body", properties.getTimelineLoadTimeoutMs());
+			page.waitForTimeout(properties.getActionDelayMs());
+			page.fill(FacebookSelectors.SEARCH_INPUT, keyword);
+			page.press(FacebookSelectors.SEARCH_INPUT, "Enter");
+			page.waitForTimeout(properties.getScrollDelayMs());
+			if (page.url() != null && page.url().contains("/search/")) {
+				if (!page.url().contains("/search/posts/")) {
+					page.navigate(searchUrl);
+				}
+				page.waitForSelector("body", properties.getTimelineLoadTimeoutMs());
+				return;
+			}
+			log.warn("Facebook UI search did not navigate to search results; using direct search URL fallback");
+		} catch (BrowserEngineException exception) {
+			log.warn("Facebook UI search failed; using direct search URL fallback: {}", exception.getMessage());
+		}
+		page.navigate(searchUrl);
+		page.waitForSelector("body", properties.getTimelineLoadTimeoutMs());
+		page.waitForTimeout(properties.getActionDelayMs());
 	}
 
 	private String homeUrl() {
