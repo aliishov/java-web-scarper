@@ -24,6 +24,7 @@ import org.raul.javawebscarper.service.SourceService;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -484,5 +485,34 @@ class ScrapeJobOrchestratorTests {
 				DAILY_DATE_TO,
 				ScrapeJobRunType.DAILY_PREVIOUS_DAY
 		);
+	}
+
+	@Test
+	void duplicateDailyPreviousDayCreationConflictIsSkipped() {
+		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
+		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
+		when(scrapeJobService.hasJobForRunType(
+				source,
+				keyword,
+				DATE_FROM,
+				DAILY_DATE_TO,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY
+		)).thenReturn(false);
+		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DAILY_DATE_TO)).thenReturn(false);
+		when(scrapeJobService.createPendingJob(
+				source,
+				keyword,
+				DATE_FROM,
+				DAILY_DATE_TO,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY
+		)).thenThrow(new DataIntegrityViolationException("daily duplicate"));
+
+		DailyScrapeRunResponseDTO response = orchestrator.createAndRunDailyPreviousDayJobs();
+
+		assertThat(response.jobsCreated()).isZero();
+		assertThat(response.jobsSucceeded()).isZero();
+		assertThat(response.jobsFailed()).isZero();
+		assertThat(response.jobsSkipped()).isEqualTo(1);
+		verify(scrapeJobService, never()).markRunning(org.mockito.ArgumentMatchers.any());
 	}
 }

@@ -109,12 +109,15 @@ public class ScrapedPostIngestionService {
 			throw new IllegalArgumentException("Scraped post must not be null");
 		}
 		String postUrl = normalizeRequiredUrl(source.getBaseUrl(), scrapedPost.postUrl(), "postUrl");
-		String text = requireNonBlank(scrapedPost.text(), "text");
+		String text = nullIfBlank(scrapedPost.text());
+		if (text == null && (scrapedPost.media() == null || scrapedPost.media().isEmpty())) {
+			throw new IllegalArgumentException("text must not be blank when media is empty");
+		}
 		OffsetDateTime postDate = scrapedPost.postDate();
 		if (postDate == null) {
 			throw new IllegalArgumentException("postDate must not be null");
 		}
-		String textHash = TextHashGenerator.sha256(text);
+		String textHash = text == null ? null : TextHashGenerator.sha256(text);
 		String externalPostId = nullIfBlank(scrapedPost.externalPostId());
 		String language = nullIfBlank(scrapedPost.language());
 		return new NormalizedScrapedPost(
@@ -189,7 +192,7 @@ public class ScrapedPostIngestionService {
 		if (existingPost.isEmpty()) {
 			existingPost = postRepository.findBySourceAndPostUrl(source, scrapedPost.postUrl());
 		}
-		if (existingPost.isEmpty()) {
+		if (existingPost.isEmpty() && scrapedPost.textHash() != null) {
 			existingPost = postRepository.findBySourceAndTextHash(source, scrapedPost.textHash());
 		}
 		return existingPost;
@@ -352,14 +355,6 @@ public class ScrapedPostIngestionService {
 
 	private String defaultAuthorUsername(Source source) {
 		return firstNonBlank(source.getCode(), source.getName(), "unknown");
-	}
-
-	private String requireNonBlank(String value, String fieldName) {
-		String normalized = nullIfBlank(value);
-		if (normalized == null) {
-			throw new IllegalArgumentException(fieldName + " must not be blank");
-		}
-		return normalized;
 	}
 
 	private String firstNonBlank(String... values) {

@@ -121,6 +121,34 @@ class PostServiceTests {
 		verify(keywordService).getEntity(secondKeyword.getId());
 	}
 
+	@Test
+	void updateRemovesMissingKeywordAndCanRepeatWithoutDuplicateLinks() {
+		Keyword secondKeyword = Keyword.builder()
+				.id(8)
+				.word("İlham Əliyev")
+				.build();
+		post.getKeywords().add(PostKeyword.builder()
+				.id(2)
+				.post(post)
+				.keyword(secondKeyword)
+				.matchedText("İlham Əliyev")
+				.build());
+		when(postRepository.findById(post.getId())).thenReturn(Optional.of(post));
+		when(sourceService.getEntity(source.getId())).thenReturn(source);
+		when(authorService.getEntity(author.getId())).thenReturn(author);
+
+		UpdatePostRequestDTO request = updateRequest(List.of(new PostKeywordRequestDTO(keyword.getId(), "Məhkəmə")));
+
+		service.update(post.getId(), request);
+		service.update(post.getId(), request);
+
+		assertThat(post.getKeywords()).hasSize(1);
+		assertThat(post.getKeywords().iterator().next().getKeyword().getId()).isEqualTo(keyword.getId());
+		assertThat(post.getKeywords().iterator().next().getPost()).isSameAs(post);
+		verify(keywordService, never()).getEntity(keyword.getId());
+		verify(keywordService, never()).getEntity(secondKeyword.getId());
+	}
+
 	private UpdatePostRequestDTO updateRequest(List<PostKeywordRequestDTO> keywords) {
 		return new UpdatePostRequestDTO(
 				source.getId(),

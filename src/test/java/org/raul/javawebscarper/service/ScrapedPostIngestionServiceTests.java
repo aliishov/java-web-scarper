@@ -208,6 +208,36 @@ class ScrapedPostIngestionServiceTests {
 		verify(postRepository).save(any(Post.class));
 	}
 
+	@Test
+	void createsMediaOnlyPostWhenUrlProvidesDeduplication() {
+		ScrapedPostDTO mediaOnlyPost = new ScrapedPostDTO(
+				"status-123",
+				"https://x.com/example/status/123",
+				POST_DATE,
+				new ScrapedAuthorDTO("x-user", "x-user", "X User", "https://x.com/x-user", null),
+				null,
+				"az",
+				List.of(new ScrapedMediaDTO("https://pbs.twimg.com/media/example.jpg", MediaType.IMAGE, 0)),
+				Map.of()
+		);
+
+		ScrapedPostIngestionResult result = service.ingest(
+				context,
+				ScraperExecutionResult.success(List.of(mediaOnlyPost))
+		);
+
+		assertThat(result.postsCreated()).isEqualTo(1);
+		assertThat(result.postsSkipped()).isZero();
+
+		ArgumentCaptor<Post> postCaptor = ArgumentCaptor.forClass(Post.class);
+		verify(postRepository).save(postCaptor.capture());
+		Post savedPost = postCaptor.getValue();
+		assertThat(savedPost.getText()).isNull();
+		assertThat(savedPost.getTextHash()).isNull();
+		assertThat(savedPost.getMedia()).hasSize(1);
+		assertThat(savedPost.getPostUrl()).isEqualTo("https://x.com/example/status/123");
+	}
+
 	private ScrapedPostDTO scrapedPost(String externalPostId, String postUrl) {
 		return new ScrapedPostDTO(
 				externalPostId,
