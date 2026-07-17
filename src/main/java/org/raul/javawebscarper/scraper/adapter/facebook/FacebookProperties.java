@@ -20,6 +20,18 @@ public class FacebookProperties {
 	@Size(max = 1024)
 	private String authStatePath = "";
 	private boolean authenticationRequired = true;
+	@Size(max = 256)
+	private String loginUrl = "https://www.facebook.com/login";
+	@Size(max = 256)
+	private String authVerificationUrl = "https://www.facebook.com/";
+	@Positive
+	private long loginTimeoutMs = 60_000;
+	@Positive
+	private long manualVerificationTimeoutMs = 300_000;
+	@Size(max = 32)
+	private String locale = "en-US";
+	@Size(max = 64)
+	private String timezoneId = "Asia/Baku";
 	private FacebookSearchMode searchMode = FacebookSearchMode.RECENT;
 	@Positive
 	private int maxScrollAttempts = 30;
