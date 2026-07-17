@@ -14,7 +14,7 @@ class FacebookAuthenticationPageInspectorTests {
 				    <div role="navigation">
 				      <a aria-label="Home" href="/home.php">Home</a>
 				    </div>
-				    <div role="search"><input placeholder="Search Facebook"></div>
+				    <div role="search"><input type="search" placeholder="Search Facebook"></div>
 				  </body>
 				</html>
 				""";
@@ -48,15 +48,25 @@ class FacebookAuthenticationPageInspectorTests {
 	void detectsCheckpointAndChallengeStates() {
 		assertThat(FacebookAuthenticationPageInspector.inspect("https://www.facebook.com/checkpoint/123", "<html><body>Security check</body></html>"))
 				.isEqualTo(FacebookAuthenticationStatus.CHECKPOINT_REQUIRED);
-		assertThat(FacebookAuthenticationPageInspector.inspect("https://www.facebook.com/", "<html><body>Enter the code from your authenticator app.</body></html>"))
+		assertThat(FacebookAuthenticationPageInspector.inspect("https://www.facebook.com/two_step_verification/", "<html><body>Enter the authentication code from your app.</body></html>"))
+				.isEqualTo(FacebookAuthenticationStatus.TWO_FACTOR_REQUIRED);
+		assertThat(FacebookAuthenticationPageInspector.inspect("https://www.facebook.com/", "<html><body>Confirm your identity with captcha.</body></html>"))
 				.isEqualTo(FacebookAuthenticationStatus.CHALLENGE_REQUIRED);
 	}
 
 	@Test
 	void detectsRateLimitAndAccountRestriction() {
 		assertThat(FacebookAuthenticationPageInspector.inspect("https://www.facebook.com/", "<html><body>You're temporarily blocked. Try again later.</body></html>"))
+				.isEqualTo(FacebookAuthenticationStatus.TEMPORARILY_BLOCKED);
+		assertThat(FacebookAuthenticationPageInspector.inspect("https://www.facebook.com/", "<html><body>Rate limit exceeded.</body></html>"))
 				.isEqualTo(FacebookAuthenticationStatus.RATE_LIMITED);
 		assertThat(FacebookAuthenticationPageInspector.inspect("https://www.facebook.com/", "<html><body>Your account has been restricted.</body></html>"))
 				.isEqualTo(FacebookAuthenticationStatus.ACCOUNT_RESTRICTED);
+	}
+
+	@Test
+	void detectsSessionExpiredDialog() {
+		assertThat(FacebookAuthenticationPageInspector.inspect("https://www.facebook.com/", "<html><body>Session expired. Please log in again.</body></html>"))
+				.isEqualTo(FacebookAuthenticationStatus.AUTH_STATE_EXPIRED);
 	}
 }

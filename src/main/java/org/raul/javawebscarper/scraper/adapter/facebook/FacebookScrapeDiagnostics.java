@@ -30,6 +30,7 @@ public class FacebookScrapeDiagnostics {
 	int noNewPostIterations;
 	boolean checkpointDetected;
 	boolean rateLimitDetected;
+	boolean authenticationExpiredDuringRun;
 	int postsCollected;
 
 	Map<String, Object> toMetadata() {
@@ -59,6 +60,7 @@ public class FacebookScrapeDiagnostics {
 		metadata.put("noNewPostIterations", noNewPostIterations);
 		metadata.put("checkpointDetected", checkpointDetected);
 		metadata.put("rateLimitDetected", rateLimitDetected);
+		metadata.put("authenticationExpiredDuringRun", authenticationExpiredDuringRun);
 		metadata.put("postsCollected", postsCollected);
 		return metadata;
 	}

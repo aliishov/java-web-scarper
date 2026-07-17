@@ -59,6 +59,17 @@ class FacebookScraperAdapterTests {
 	}
 
 	@Test
+	void failsWithClearErrorWhenConfiguredAuthStateFileDoesNotExist() {
+		properties.setAuthStatePath("build/tmp/nonexistent-facebook-storage-state.json");
+
+		ScraperExecutionResult result = adapter.scrape(context(Language.AZ));
+
+		assertThat(result.status()).isEqualTo(ScraperExecutionStatus.FAILED);
+		assertThat(result.errorMessage()).contains("FACEBOOK_AUTH_STATE_MISSING");
+		assertThat(result.errorMessage()).contains("authStateUsed=false");
+	}
+
+	@Test
 	void extractsAuthorTextDateLanguageAndMediaFromPostContainer() {
 		Element article = article("""
 				<article lang="az">

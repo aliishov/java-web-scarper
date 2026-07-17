@@ -102,6 +102,12 @@ scraper:
     base-url: ${SCRAPER_FACEBOOK_BASE_URL:https://www.facebook.com/}
     auth-state-path: ${FACEBOOK_AUTH_STATE_PATH:}
     authentication-required: ${SCRAPER_FACEBOOK_AUTHENTICATION_REQUIRED:true}
+    login-url: ${SCRAPER_FACEBOOK_LOGIN_URL:https://www.facebook.com/login}
+    auth-verification-url: ${SCRAPER_FACEBOOK_AUTH_VERIFICATION_URL:https://www.facebook.com/}
+    login-timeout-ms: ${SCRAPER_FACEBOOK_LOGIN_TIMEOUT_MS:60000}
+    manual-verification-timeout-ms: ${SCRAPER_FACEBOOK_MANUAL_VERIFICATION_TIMEOUT_MS:300000}
+    locale: ${SCRAPER_FACEBOOK_LOCALE:en-US}
+    timezone-id: ${SCRAPER_FACEBOOK_TIMEZONE_ID:Asia/Baku}
     search-mode: ${SCRAPER_FACEBOOK_SEARCH_MODE:RECENT}
     max-scroll-attempts: ${SCRAPER_FACEBOOK_MAX_SCROLL_ATTEMPTS:30}
     no-new-post-limit: ${SCRAPER_FACEBOOK_NO_NEW_POST_LIMIT:4}

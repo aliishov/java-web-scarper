@@ -16,8 +16,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class FacebookAuthStateGenerator {
 
-	private static final String LOGIN_URL = "https://www.facebook.com/";
-	private static final long DEFAULT_TIMEOUT_MS = 180_000;
+	private static final String DEFAULT_LOGIN_URL = "https://www.facebook.com/login";
+	private static final String DEFAULT_VERIFICATION_URL = "https://www.facebook.com/";
+	private static final String DEFAULT_LOCALE = "en-US";
+	private static final String DEFAULT_TIMEZONE_ID = "Asia/Baku";
+	private static final long DEFAULT_TIMEOUT_MS = 300_000;
+	private static final long STATUS_POLL_INTERVAL_MS = 1_500;
 
 	private final Map<String, String> environment;
 	private final PrintStream output;
@@ -33,7 +37,7 @@ public class FacebookAuthStateGenerator {
 		try {
 			FacebookAuthStateRequest request = buildRequest();
 			createStorageState(request);
-			output.println("Facebook authentication state was created successfully.");
+			output.println("Facebook authentication state was saved successfully.");
 			return 0;
 		} catch (IllegalArgumentException exception) {
 			output.println(exception.getMessage());
@@ -45,25 +49,97 @@ public class FacebookAuthStateGenerator {
 	}
 
 	FacebookAuthStateRequest buildRequest() {
-		String authStatePath = requiredEnv("FACEBOOK_AUTH_STATE_PATH");
-		long timeoutMs = optionalLongEnv("FACEBOOK_AUTH_TIMEOUT_MS", DEFAULT_TIMEOUT_MS);
-		return new FacebookAuthStateRequest(Path.of(authStatePath), timeoutMs);
+		Path authStatePath = normalizeAuthStatePath(requiredEnv("FACEBOOK_AUTH_STATE_PATH"));
+		long timeoutMs = optionalLongEnv(
+				"FACEBOOK_MANUAL_VERIFICATION_TIMEOUT_MS",
+				optionalLongEnv("FACEBOOK_AUTH_TIMEOUT_MS", DEFAULT_TIMEOUT_MS)
+		);
+		return new FacebookAuthStateRequest(
+				authStatePath,
+				optionalEnv("FACEBOOK_LOGIN_URL", DEFAULT_LOGIN_URL),
+				optionalEnv("FACEBOOK_AUTH_VERIFICATION_URL", DEFAULT_VERIFICATION_URL),
+				timeoutMs,
+				optionalEnv("FACEBOOK_LOCALE", DEFAULT_LOCALE),
+				optionalEnv("FACEBOOK_TIMEZONE_ID", DEFAULT_TIMEZONE_ID)
+		);
+	}
+
+	void validateAuthStatePath(Path authStatePath) {
+		if (Files.isDirectory(authStatePath)) {
+			throw new IllegalArgumentException("FACEBOOK_AUTH_STATE_PATH must point to a file, not a directory.");
+		}
+		Path parent = authStatePath.getParent();
+		if (parent == null) {
+			return;
+		}
+		try {
+			Files.createDirectories(parent);
+		} catch (Exception exception) {
+			throw new IllegalArgumentException("Failed to create parent directory for Facebook authentication state file.");
+		}
 	}
 
 	private void createStorageState(FacebookAuthStateRequest request) {
-		createParentDirectory(request.authStatePath());
+		validateAuthStatePath(request.authStatePath());
+		boolean stateWriteAttempted = false;
 		try (Playwright playwright = Playwright.create();
 				Browser browser = playwright.chromium().launch(new com.microsoft.playwright.BrowserType.LaunchOptions()
-						.setHeadless(false));
-				BrowserContext context = browser.newContext()) {
-			Page page = context.newPage();
-			page.navigate(LOGIN_URL);
-			output.println("Complete Facebook login/checkpoint/2FA manually in the opened browser.");
-			output.println("No credentials are read by this task. Waiting for an authenticated Facebook page...");
-			if (!waitUntilAuthenticated(page, request.timeoutMs())) {
-				throw new IllegalStateException("Facebook authentication did not complete before timeout.");
+						.setHeadless(false))) {
+			try (BrowserContext context = browser.newContext(contextOptions(request))) {
+				Page page = context.newPage();
+				page.navigate(request.loginUrl());
+				output.println("Complete Facebook login in the opened browser.");
+				output.println("Complete 2FA, CAPTCHA, or checkpoint manually if Facebook asks.");
+				output.println("No credentials are read by this task. Waiting for an authenticated Facebook page...");
+				if (!waitUntilAuthenticated(page, request.manualVerificationTimeoutMs())) {
+					throw new IllegalStateException("Facebook authentication did not complete before timeout.");
+				}
+				stateWriteAttempted = true;
+				context.storageState(new BrowserContext.StorageStateOptions().setPath(request.authStatePath()));
 			}
-			context.storageState(new BrowserContext.StorageStateOptions().setPath(request.authStatePath()));
+			validateSavedState(browser, request);
+		} catch (RuntimeException exception) {
+			if (stateWriteAttempted) {
+				deleteInvalidState(request.authStatePath());
+			}
+			throw exception;
+		}
+	}
+
+	private Browser.NewContextOptions contextOptions(FacebookAuthStateRequest request) {
+		Browser.NewContextOptions options = new Browser.NewContextOptions();
+		if (request.locale() != null && !request.locale().isBlank()) {
+			options.setLocale(request.locale());
+		}
+		if (request.timezoneId() != null && !request.timezoneId().isBlank()) {
+			options.setTimezoneId(request.timezoneId());
+		}
+		return options;
+	}
+
+	private void validateSavedState(Browser browser, FacebookAuthStateRequest request) {
+		try {
+			if (!Files.isRegularFile(request.authStatePath()) || Files.size(request.authStatePath()) <= 0) {
+				throw new IllegalStateException("Facebook authentication state file was not saved correctly.");
+			}
+		} catch (Exception exception) {
+			deleteInvalidState(request.authStatePath());
+			throw new IllegalStateException("Facebook authentication state file was not saved correctly.");
+		}
+		Browser.NewContextOptions options = contextOptions(request)
+				.setStorageStatePath(request.authStatePath());
+		try (BrowserContext validationContext = browser.newContext(options)) {
+			Page validationPage = validationContext.newPage();
+			validationPage.navigate(request.authVerificationUrl());
+			validationPage.waitForTimeout(STATUS_POLL_INTERVAL_MS);
+			FacebookAuthenticationStatus status = FacebookAuthenticationPageInspector.inspect(
+					validationPage.url(),
+					validationPage.content()
+			);
+			if (status != FacebookAuthenticationStatus.AUTHENTICATED) {
+				deleteInvalidState(request.authStatePath());
+				throw new IllegalStateException("Saved Facebook authentication state is not authenticated. Repeat facebookAuthStateInteractive.");
+			}
 		}
 	}
 
@@ -79,12 +155,18 @@ public class FacebookAuthStateGenerator {
 				output.println("Facebook authentication status: " + status);
 				previousStatus = status;
 			}
-			if (status == FacebookAuthenticationStatus.RATE_LIMITED || status == FacebookAuthenticationStatus.ACCOUNT_RESTRICTED) {
+			if (status == FacebookAuthenticationStatus.RATE_LIMITED
+					|| status == FacebookAuthenticationStatus.TEMPORARILY_BLOCKED
+					|| status == FacebookAuthenticationStatus.ACCOUNT_RESTRICTED) {
 				throw new IllegalStateException("Facebook returned " + status + "; cannot create a healthy storage state.");
 			}
-			page.waitForTimeout(1_000);
+			page.waitForTimeout(STATUS_POLL_INTERVAL_MS);
 		}
 		return false;
+	}
+
+	private Path normalizeAuthStatePath(String value) {
+		return Path.of(value).toAbsolutePath().normalize();
 	}
 
 	private String requiredEnv(String name) {
@@ -93,6 +175,11 @@ public class FacebookAuthStateGenerator {
 			throw new IllegalArgumentException(name + " environment variable is required.");
 		}
 		return value.trim();
+	}
+
+	private String optionalEnv(String name, String fallback) {
+		String value = environment.get(name);
+		return value == null || value.isBlank() ? fallback : value.trim();
 	}
 
 	private long optionalLongEnv(String name, long fallback) {
@@ -107,21 +194,23 @@ public class FacebookAuthStateGenerator {
 		}
 	}
 
-	private void createParentDirectory(Path authStatePath) {
-		Path parent = authStatePath.toAbsolutePath().normalize().getParent();
-		if (parent == null) {
-			return;
-		}
+	private void deleteInvalidState(Path authStatePath) {
 		try {
-			Files.createDirectories(parent);
-		} catch (Exception exception) {
-			throw new IllegalArgumentException("Failed to create parent directory for Facebook authentication state file.");
+			if (authStatePath != null && Files.isRegularFile(authStatePath)) {
+				Files.deleteIfExists(authStatePath);
+			}
+		} catch (Exception ignored) {
+			// Do not expose paths or file contents in auth utility output.
 		}
 	}
 
 	record FacebookAuthStateRequest(
 			Path authStatePath,
-			long timeoutMs
+			String loginUrl,
+			String authVerificationUrl,
+			long manualVerificationTimeoutMs,
+			String locale,
+			String timezoneId
 	) {
 	}
 }

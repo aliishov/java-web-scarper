@@ -23,6 +23,7 @@ import org.raul.javawebscarper.scraper.support.DateRangeValidator;
 import org.raul.javawebscarper.scraper.support.UrlNormalizer;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -83,7 +84,8 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 			sessionOptions = sessionOptions(diagnostics);
 		} catch (BrowserEngineException exception) {
 			log.warn("Facebook auth state is not usable: {}", exception.getMessage());
-			return failed("FACEBOOK_AUTH_STATE_MISSING: " + exception.getMessage(), diagnostics);
+			diagnostics.authenticationStatus = FacebookAuthenticationStatus.AUTH_STATE_MISSING;
+			return failed(authenticationFailureMessage(FacebookAuthenticationStatus.AUTH_STATE_MISSING), diagnostics);
 		}
 
 		log.info(
@@ -150,19 +152,30 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 		String authStatePath = properties.getAuthStatePath();
 		if (authStatePath == null || authStatePath.isBlank()) {
 			if (properties.isAuthenticationRequired()) {
-				throw new BrowserEngineException("Facebook authentication state file is not configured. Set FACEBOOK_AUTH_STATE_PATH and create it with facebookAuthStateInteractive.");
+				throw new BrowserEngineException("Facebook authentication state is not configured");
 			}
 			return BrowserSessionOptions.defaults();
 		}
+		Path path = Path.of(authStatePath.trim()).toAbsolutePath().normalize();
+		if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
+			throw new BrowserEngineException("Facebook authentication state file is missing or unreadable");
+		}
 		diagnostics.authStateUsed = true;
-		return new BrowserSessionOptions(Path.of(authStatePath.trim()), "en-US", "Asia/Baku", null, Map.of());
+		return new BrowserSessionOptions(path, properties.getLocale(), properties.getTimezoneId(), null, Map.of());
 	}
 
 	private FacebookAuthenticationStatus verifyAuthenticatedSession(BrowserPage page) {
-		page.navigate(homeUrl());
-		page.waitForSelector("body", properties.getAuthenticationTimeoutMs());
+		page.navigate(authVerificationUrl());
+		page.waitForSelector("body", properties.getLoginTimeoutMs());
 		page.waitForTimeout(properties.getActionDelayMs());
 		return authenticationVerifier.verify(page);
+	}
+
+	private String authVerificationUrl() {
+		String url = properties.getAuthVerificationUrl() == null || properties.getAuthVerificationUrl().isBlank()
+				? FacebookScraperSupport.BASE_URL
+				: properties.getAuthVerificationUrl().trim();
+		return url.endsWith("/") ? url : url + "/";
 	}
 
 	private void openSearchPage(BrowserPage page, String keyword, String searchUrl) {
@@ -217,6 +230,7 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 			if (isHardFailure(pageState)) {
 				diagnostics.authenticationStatus = pageState;
 				incrementAuthenticationDiagnostic(pageState, diagnostics);
+				diagnostics.authenticationExpiredDuringRun = true;
 				extractionFailures = true;
 				break;
 			}
@@ -577,17 +591,20 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 
 	private boolean isHardFailure(FacebookAuthenticationStatus status) {
 		return status == FacebookAuthenticationStatus.AUTH_REQUIRED
+				|| status == FacebookAuthenticationStatus.AUTH_STATE_MISSING
 				|| status == FacebookAuthenticationStatus.AUTH_STATE_EXPIRED
 				|| status == FacebookAuthenticationStatus.CHECKPOINT_REQUIRED
 				|| status == FacebookAuthenticationStatus.CHALLENGE_REQUIRED
+				|| status == FacebookAuthenticationStatus.TWO_FACTOR_REQUIRED
 				|| status == FacebookAuthenticationStatus.RATE_LIMITED
+				|| status == FacebookAuthenticationStatus.TEMPORARILY_BLOCKED
 				|| status == FacebookAuthenticationStatus.ACCOUNT_RESTRICTED;
 	}
 
 	private void incrementAuthenticationDiagnostic(FacebookAuthenticationStatus status, FacebookScrapeDiagnostics diagnostics) {
 		switch (status) {
 			case CHECKPOINT_REQUIRED -> diagnostics.checkpointDetected = true;
-			case RATE_LIMITED -> diagnostics.rateLimitDetected = true;
+			case RATE_LIMITED, TEMPORARILY_BLOCKED -> diagnostics.rateLimitDetected = true;
 			default -> {
 			}
 		}
@@ -604,14 +621,20 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 
 	private String authenticationFailureMessage(FacebookAuthenticationStatus status) {
 		return switch (status) {
+			case AUTH_STATE_MISSING ->
+					"FACEBOOK_AUTH_STATE_MISSING: Facebook authentication state is not configured. Generate it with facebookAuthStateInteractive.";
 			case AUTH_REQUIRED, AUTH_STATE_EXPIRED ->
 					"FACEBOOK_AUTH_STATE_EXPIRED: Facebook authentication state is missing or expired. Regenerate it with facebookAuthStateInteractive.";
 			case CHECKPOINT_REQUIRED ->
 					"FACEBOOK_CHECKPOINT_REQUIRED: Complete the Facebook checkpoint manually and regenerate authentication state.";
 			case CHALLENGE_REQUIRED ->
 					"FACEBOOK_CHALLENGE_REQUIRED: Complete the Facebook verification step manually and regenerate authentication state.";
+			case TWO_FACTOR_REQUIRED ->
+					"FACEBOOK_TWO_FACTOR_REQUIRED: Complete Facebook two-factor verification manually and regenerate authentication state.";
 			case RATE_LIMITED ->
 					"FACEBOOK_RATE_LIMITED: Facebook temporarily limited authenticated access. Retry later.";
+			case TEMPORARILY_BLOCKED ->
+					"FACEBOOK_TEMPORARILY_BLOCKED: Facebook temporarily blocked authenticated access. Retry later.";
 			case ACCOUNT_RESTRICTED ->
 					"FACEBOOK_ACCOUNT_RESTRICTED: The authenticated Facebook account is restricted.";
 			case UNKNOWN ->
