@@ -15,14 +15,20 @@ public final class FacebookAuthenticationPageInspector {
 		String normalizedUrl = normalize(url);
 		String normalizedText = normalize(document.text());
 
-		if (containsRateLimit(normalizedText)) {
-			return FacebookAuthenticationStatus.RATE_LIMITED;
+		if (containsTemporaryBlock(normalizedText)) {
+			return FacebookAuthenticationStatus.TEMPORARILY_BLOCKED;
 		}
 		if (containsAccountRestriction(normalizedText)) {
 			return FacebookAuthenticationStatus.ACCOUNT_RESTRICTED;
 		}
+		if (containsRateLimit(normalizedText)) {
+			return FacebookAuthenticationStatus.RATE_LIMITED;
+		}
 		if (containsCheckpoint(normalizedUrl, normalizedText)) {
 			return FacebookAuthenticationStatus.CHECKPOINT_REQUIRED;
+		}
+		if (containsTwoFactor(normalizedUrl, normalizedText, document)) {
+			return FacebookAuthenticationStatus.TWO_FACTOR_REQUIRED;
 		}
 		if (containsChallenge(normalizedText, document)) {
 			return FacebookAuthenticationStatus.CHALLENGE_REQUIRED;
@@ -30,7 +36,7 @@ public final class FacebookAuthenticationPageInspector {
 		if (isLoginRedirect(normalizedUrl)) {
 			return FacebookAuthenticationStatus.AUTH_REQUIRED;
 		}
-		if (hasLoginForm(document) || containsLoginWall(normalizedText)) {
+		if (hasLoginForm(document) || containsLoginWall(normalizedText) || containsSessionExpired(normalizedText)) {
 			return FacebookAuthenticationStatus.AUTH_STATE_EXPIRED;
 		}
 		if (isAuthenticatedPage(normalizedUrl, document)) {
@@ -46,11 +52,15 @@ public final class FacebookAuthenticationPageInspector {
 	private static boolean isAuthenticatedPage(String normalizedUrl, Document document) {
 		return normalizedUrl.contains("facebook.com")
 				&& !normalizedUrl.contains("/login")
-				&& document.selectFirst(FacebookSelectors.AUTHENTICATED_NAVIGATION) != null;
+				&& !normalizedUrl.contains("/checkpoint")
+				&& !hasLoginForm(document)
+				&& document.selectFirst(FacebookSelectors.AUTHENTICATED_NAVIGATION) != null
+				&& document.selectFirst(FacebookSelectors.SEARCH_INPUT) != null;
 	}
 
 	private static boolean isLoginRedirect(String normalizedUrl) {
 		return normalizedUrl.contains("/login")
+				|| normalizedUrl.contains("/login/identify")
 				|| normalizedUrl.contains("/recover/initiate")
 				|| normalizedUrl.contains("/reg/");
 	}
@@ -63,42 +73,57 @@ public final class FacebookAuthenticationPageInspector {
 		return normalizedText.contains("log into facebook")
 				|| normalizedText.contains("log in to facebook")
 				|| normalizedText.contains("facebook-a daxil ol")
-				|| normalizedText.contains("войдите на facebook")
-				|| normalizedText.contains("войдите в facebook")
-				|| normalizedText.contains("create new account")
-				|| normalizedText.contains("создать аккаунт");
+				|| normalizedText.contains("daxil ol")
+				|| normalizedText.contains("giris yap")
+				|| normalizedText.contains("giriş yap")
+				|| normalizedText.contains("create new account");
+	}
+
+	private static boolean containsSessionExpired(String normalizedText) {
+		return normalizedText.contains("session expired")
+				|| normalizedText.contains("please log in again")
+				|| normalizedText.contains("log in again");
 	}
 
 	private static boolean containsCheckpoint(String normalizedUrl, String normalizedText) {
 		return normalizedUrl.contains("/checkpoint/")
 				|| normalizedText.contains("checkpoint")
-				|| normalizedText.contains("security check")
-				|| normalizedText.contains("проверка безопасности");
+				|| normalizedText.contains("security check");
+	}
+
+	private static boolean containsTwoFactor(String normalizedUrl, String normalizedText, Document document) {
+		return normalizedUrl.contains("/two_step_verification/")
+				|| normalizedUrl.contains("/two_factor/")
+				|| normalizedText.contains("two-factor")
+				|| normalizedText.contains("two factor")
+				|| normalizedText.contains("two-step verification")
+				|| normalizedText.contains("authentication code")
+				|| document.selectFirst("input[name*='approvals_code' i], input[autocomplete='one-time-code']") != null;
 	}
 
 	private static boolean containsChallenge(String normalizedText, Document document) {
-		return normalizedText.contains("enter the code")
-				|| normalizedText.contains("two-factor")
-				|| normalizedText.contains("two factor")
-				|| normalizedText.contains("captcha")
+		return normalizedText.contains("captcha")
 				|| normalizedText.contains("confirm your identity")
-				|| normalizedText.contains("подтвердите личность")
-				|| document.selectFirst("iframe[src*='captcha'], iframe[title*='captcha' i], input[name*='approvals_code' i]") != null;
+				|| normalizedText.contains("suspicious login")
+				|| normalizedText.contains("unusual login")
+				|| document.selectFirst("iframe[src*='captcha'], iframe[title*='captcha' i]") != null;
 	}
 
 	private static boolean containsRateLimit(String normalizedText) {
-		return normalizedText.contains("you’re temporarily blocked")
-				|| normalizedText.contains("you're temporarily blocked")
-				|| normalizedText.contains("try again later")
+		return normalizedText.contains("rate limit")
 				|| normalizedText.contains("too many requests")
-				|| normalizedText.contains("temporarily blocked")
-				|| normalizedText.contains("временно заблокировано");
+				|| normalizedText.contains("too many actions");
+	}
+
+	private static boolean containsTemporaryBlock(String normalizedText) {
+		return normalizedText.contains("you're temporarily blocked")
+				|| normalizedText.contains("you are temporarily blocked")
+				|| normalizedText.contains("temporarily blocked");
 	}
 
 	private static boolean containsAccountRestriction(String normalizedText) {
 		return normalizedText.contains("account restricted")
-				|| normalizedText.contains("your account has been restricted")
-				|| normalizedText.contains("аккаунт ограничен");
+				|| normalizedText.contains("your account has been restricted");
 	}
 
 	private static String normalize(String value) {

@@ -79,7 +79,9 @@ public class FacebookAuthStateGenerator {
 				output.println("Facebook authentication status: " + status);
 				previousStatus = status;
 			}
-			if (status == FacebookAuthenticationStatus.RATE_LIMITED || status == FacebookAuthenticationStatus.ACCOUNT_RESTRICTED) {
+			if (status == FacebookAuthenticationStatus.RATE_LIMITED
+					|| status == FacebookAuthenticationStatus.TEMPORARILY_BLOCKED
+					|| status == FacebookAuthenticationStatus.ACCOUNT_RESTRICTED) {
 				throw new IllegalStateException("Facebook returned " + status + "; cannot create a healthy storage state.");
 			}
 			page.waitForTimeout(1_000);
