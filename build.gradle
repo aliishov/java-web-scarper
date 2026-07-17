@@ -68,3 +68,11 @@ tasks.register('xAuthStateInteractive', JavaExec) {
     args '--interactive-only'
     standardInput = System.in
 }
+
+tasks.register('facebookAuthStateInteractive', JavaExec) {
+    group = 'playwright'
+    description = 'Opens Facebook in headed Chromium and saves storage state after manual authentication.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.raul.javawebscarper.tools.facebookauth.FacebookAuthStateGenerator'
+    standardInput = System.in
+}

@@ -10,6 +10,11 @@ import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.caliberaz.CaliberAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.haqqinaz.HaqqinAzNewsScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.facebook.FacebookDateParser;
+import org.raul.javawebscarper.scraper.adapter.facebook.FacebookProperties;
+import org.raul.javawebscarper.scraper.adapter.facebook.FacebookAuthenticationVerifier;
+import org.raul.javawebscarper.scraper.adapter.facebook.FacebookScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.facebook.FacebookSearchQueryBuilder;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzSearchPeriodResolver;
@@ -173,6 +178,25 @@ class ScraperAdapterRegistryTests {
 		assertThat(registry.findAdapter(Source.builder().code("X").build())).contains(xAdapter);
 		assertThat(registry.findAdapter(Source.builder().code("social").baseUrl("https://twitter.com/").build())).contains(xAdapter);
 		assertThat(registry.getRegisteredSourceCodes()).contains("X_COM");
+	}
+
+	@Test
+	void findsFacebookAdapterByCurrentAndLegacySourceCodes() {
+		FacebookScraperAdapter facebookAdapter = new FacebookScraperAdapter(
+				null,
+				new FacebookProperties(),
+				new FacebookSearchQueryBuilder(),
+				new FacebookDateParser("Asia/Baku"),
+				new FacebookAuthenticationVerifier()
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(facebookAdapter, unsupportedAdapter), unsupportedAdapter);
+
+		assertThat(registry.findAdapter(Source.builder().code("FACEBOOK").build())).contains(facebookAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("FB").build())).contains(facebookAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("FACEBOOK_COM").build())).contains(facebookAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("META_FACEBOOK").build())).contains(facebookAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("social").baseUrl("https://m.facebook.com/").build())).contains(facebookAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("FACEBOOK");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {
