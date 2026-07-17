@@ -97,6 +97,25 @@ scraper:
     no-new-post-limit: ${SCRAPER_X_NO_NEW_POST_LIMIT:3}
     post-open-timeout-ms: ${SCRAPER_X_POST_OPEN_TIMEOUT_MS:15000}
     prefer-latest-tab: ${SCRAPER_X_PREFER_LATEST_TAB:true}
+  facebook:
+    enabled: ${SCRAPER_FACEBOOK_ENABLED:true}
+    base-url: ${SCRAPER_FACEBOOK_BASE_URL:https://www.facebook.com/}
+    auth-state-path: ${FACEBOOK_AUTH_STATE_PATH:}
+    authentication-required: ${SCRAPER_FACEBOOK_AUTHENTICATION_REQUIRED:true}
+    search-mode: ${SCRAPER_FACEBOOK_SEARCH_MODE:RECENT}
+    max-scroll-attempts: ${SCRAPER_FACEBOOK_MAX_SCROLL_ATTEMPTS:30}
+    no-new-post-limit: ${SCRAPER_FACEBOOK_NO_NEW_POST_LIMIT:4}
+    scroll-delay-ms: ${SCRAPER_FACEBOOK_SCROLL_DELAY_MS:1400}
+    include-sponsored: ${SCRAPER_FACEBOOK_INCLUDE_SPONSORED:false}
+    include-reels: ${SCRAPER_FACEBOOK_INCLUDE_REELS:false}
+    include-shared-posts: ${SCRAPER_FACEBOOK_INCLUDE_SHARED_POSTS:true}
+    include-group-posts: ${SCRAPER_FACEBOOK_INCLUDE_GROUP_POSTS:true}
+    include-page-posts: ${SCRAPER_FACEBOOK_INCLUDE_PAGE_POSTS:true}
+    open-post-for-details: ${SCRAPER_FACEBOOK_OPEN_POST_FOR_DETAILS:true}
+    action-delay-ms: ${SCRAPER_FACEBOOK_ACTION_DELAY_MS:500}
+    article-open-delay-ms: ${SCRAPER_FACEBOOK_ARTICLE_OPEN_DELAY_MS:700}
+    authentication-timeout-ms: ${SCRAPER_FACEBOOK_AUTHENTICATION_TIMEOUT_MS:60000}
+    timeline-load-timeout-ms: ${SCRAPER_FACEBOOK_TIMELINE_LOAD_TIMEOUT_MS:20000}
 
 springdoc:
   api-docs:

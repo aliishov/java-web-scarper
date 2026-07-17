@@ -1,6 +1,7 @@
 package org.raul.javawebscarper.config;
 
 import org.raul.javawebscarper.browser.BrowserEngineProperties;
+import org.raul.javawebscarper.scraper.adapter.facebook.FacebookProperties;
 import org.raul.javawebscarper.scraper.adapter.xcom.XComProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -16,6 +17,7 @@ import java.time.Clock;
 		DailyScrapingProperties.class,
 		ScraperEngineProperties.class,
 		BrowserEngineProperties.class,
+		FacebookProperties.class,
 		XComProperties.class
 })
 public class SchedulingConfig {
