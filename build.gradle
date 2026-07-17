@@ -70,8 +70,8 @@ tasks.register('xAuthStateInteractive', JavaExec) {
 }
 
 tasks.register('facebookAuthStateInteractive', JavaExec) {
-    group = 'playwright'
-    description = 'Opens Facebook in headed Chromium and saves storage state after manual authentication.'
+    group = 'authentication'
+    description = 'Creates Facebook Playwright storage state using interactive login.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'org.raul.javawebscarper.tools.facebookauth.FacebookAuthStateGenerator'
     standardInput = System.in
