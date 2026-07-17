@@ -81,6 +81,7 @@ public class FacebookAuthStateGenerator {
 
 	private void createStorageState(FacebookAuthStateRequest request) {
 		validateAuthStatePath(request.authStatePath());
+		boolean stateWriteAttempted = false;
 		try (Playwright playwright = Playwright.create();
 				Browser browser = playwright.chromium().launch(new com.microsoft.playwright.BrowserType.LaunchOptions()
 						.setHeadless(false))) {
@@ -91,14 +92,16 @@ public class FacebookAuthStateGenerator {
 				output.println("Complete 2FA, CAPTCHA, or checkpoint manually if Facebook asks.");
 				output.println("No credentials are read by this task. Waiting for an authenticated Facebook page...");
 				if (!waitUntilAuthenticated(page, request.manualVerificationTimeoutMs())) {
-					deleteInvalidState(request.authStatePath());
 					throw new IllegalStateException("Facebook authentication did not complete before timeout.");
 				}
+				stateWriteAttempted = true;
 				context.storageState(new BrowserContext.StorageStateOptions().setPath(request.authStatePath()));
 			}
 			validateSavedState(browser, request);
 		} catch (RuntimeException exception) {
-			deleteInvalidState(request.authStatePath());
+			if (stateWriteAttempted) {
+				deleteInvalidState(request.authStatePath());
+			}
 			throw exception;
 		}
 	}
