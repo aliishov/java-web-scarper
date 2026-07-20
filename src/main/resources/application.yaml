@@ -122,6 +122,29 @@ scraper:
     article-open-delay-ms: ${SCRAPER_FACEBOOK_ARTICLE_OPEN_DELAY_MS:700}
     authentication-timeout-ms: ${SCRAPER_FACEBOOK_AUTHENTICATION_TIMEOUT_MS:60000}
     timeline-load-timeout-ms: ${SCRAPER_FACEBOOK_TIMELINE_LOAD_TIMEOUT_MS:20000}
+  instagram:
+    enabled: ${SCRAPER_INSTAGRAM_ENABLED:true}
+    base-url: ${SCRAPER_INSTAGRAM_BASE_URL:https://www.instagram.com}
+    auth-state-path: ${INSTAGRAM_AUTH_STATE_PATH:}
+    authentication-required: ${SCRAPER_INSTAGRAM_AUTHENTICATION_REQUIRED:true}
+    login-url: ${SCRAPER_INSTAGRAM_LOGIN_URL:https://www.instagram.com/accounts/login/}
+    auth-verification-url: ${SCRAPER_INSTAGRAM_AUTH_VERIFICATION_URL:https://www.instagram.com/}
+    login-timeout-ms: ${SCRAPER_INSTAGRAM_LOGIN_TIMEOUT_MS:60000}
+    manual-verification-timeout-ms: ${SCRAPER_INSTAGRAM_MANUAL_VERIFICATION_TIMEOUT_MS:300000}
+    locale: ${SCRAPER_INSTAGRAM_LOCALE:en-US}
+    timezone-id: ${SCRAPER_INSTAGRAM_TIMEZONE_ID:Asia/Baku}
+    search-mode: ${SCRAPER_INSTAGRAM_SEARCH_MODE:AUTO}
+    max-scroll-attempts: ${SCRAPER_INSTAGRAM_MAX_SCROLL_ATTEMPTS:30}
+    no-new-post-limit: ${SCRAPER_INSTAGRAM_NO_NEW_POST_LIMIT:4}
+    max-candidates: ${SCRAPER_INSTAGRAM_MAX_CANDIDATES:200}
+    max-carousel-items: ${SCRAPER_INSTAGRAM_MAX_CAROUSEL_ITEMS:20}
+    scroll-delay-ms: ${SCRAPER_INSTAGRAM_SCROLL_DELAY_MS:1300}
+    action-delay-ms: ${SCRAPER_INSTAGRAM_ACTION_DELAY_MS:500}
+    post-open-timeout-ms: ${SCRAPER_INSTAGRAM_POST_OPEN_TIMEOUT_MS:15000}
+    timeline-load-timeout-ms: ${SCRAPER_INSTAGRAM_TIMELINE_LOAD_TIMEOUT_MS:20000}
+    include-reels: ${SCRAPER_INSTAGRAM_INCLUDE_REELS:false}
+    include-sponsored: ${SCRAPER_INSTAGRAM_INCLUDE_SPONSORED:false}
+    open-post-for-details: ${SCRAPER_INSTAGRAM_OPEN_POST_FOR_DETAILS:true}
 
 springdoc:
   api-docs:
