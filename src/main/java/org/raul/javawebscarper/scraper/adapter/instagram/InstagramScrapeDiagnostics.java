@@ -34,6 +34,7 @@ public class InstagramScrapeDiagnostics {
 	int noNewPostIterations;
 	boolean challengeDetected;
 	boolean rateLimitDetected;
+	boolean authenticationExpiredDuringRun;
 	int postsCollected;
 	int extractionFailures;
 
@@ -68,6 +69,7 @@ public class InstagramScrapeDiagnostics {
 		metadata.put("noNewPostIterations", noNewPostIterations);
 		metadata.put("challengeDetected", challengeDetected);
 		metadata.put("rateLimitDetected", rateLimitDetected);
+		metadata.put("authenticationExpiredDuringRun", authenticationExpiredDuringRun);
 		metadata.put("postsCollected", postsCollected);
 		metadata.put("extractionFailures", extractionFailures);
 		return metadata;

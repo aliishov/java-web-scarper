@@ -102,6 +102,7 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 			if (isHardFailure(searchPageStatus)) {
 				diagnostics.authenticationStatus = searchPageStatus;
 				incrementAuthenticationDiagnostic(searchPageStatus, diagnostics);
+				diagnostics.authenticationExpiredDuringRun = true;
 				return failed(authenticationFailureMessage(searchPageStatus), diagnostics);
 			}
 
@@ -217,6 +218,7 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 			if (isHardFailure(pageStatus)) {
 				diagnostics.authenticationStatus = pageStatus;
 				incrementAuthenticationDiagnostic(pageStatus, diagnostics);
+				diagnostics.authenticationExpiredDuringRun = true;
 				break;
 			}
 			int before = candidates.size();
@@ -271,6 +273,7 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 				if (isHardFailure(pageStatus)) {
 					diagnostics.authenticationStatus = pageStatus;
 					incrementAuthenticationDiagnostic(pageStatus, diagnostics);
+					diagnostics.authenticationExpiredDuringRun = true;
 					break;
 				}
 				InstagramScraperSupport.extractPost(document, context, candidate, dateParser, diagnostics, properties)
@@ -347,15 +350,17 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 				|| status == InstagramAuthenticationStatus.AUTH_STATE_EXPIRED
 				|| status == InstagramAuthenticationStatus.CHALLENGE_REQUIRED
 				|| status == InstagramAuthenticationStatus.TWO_FACTOR_REQUIRED
+				|| status == InstagramAuthenticationStatus.CONSENT_REQUIRED
 				|| status == InstagramAuthenticationStatus.RATE_LIMITED
 				|| status == InstagramAuthenticationStatus.ACCOUNT_RESTRICTED
+				|| status == InstagramAuthenticationStatus.TEMPORARILY_BLOCKED
 				|| status == InstagramAuthenticationStatus.SUSPICIOUS_LOGIN;
 	}
 
 	private void incrementAuthenticationDiagnostic(InstagramAuthenticationStatus status, InstagramScrapeDiagnostics diagnostics) {
 		switch (status) {
-			case CHALLENGE_REQUIRED, TWO_FACTOR_REQUIRED, SUSPICIOUS_LOGIN -> diagnostics.challengeDetected = true;
-			case RATE_LIMITED -> diagnostics.rateLimitDetected = true;
+			case CHALLENGE_REQUIRED, TWO_FACTOR_REQUIRED, SUSPICIOUS_LOGIN, CONSENT_REQUIRED -> diagnostics.challengeDetected = true;
+			case RATE_LIMITED, TEMPORARILY_BLOCKED -> diagnostics.rateLimitDetected = true;
 			default -> {
 			}
 		}
@@ -371,8 +376,12 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 					"INSTAGRAM_CHALLENGE_REQUIRED: Complete the Instagram challenge manually and regenerate authentication state.";
 			case TWO_FACTOR_REQUIRED ->
 					"INSTAGRAM_TWO_FACTOR_REQUIRED: Complete Instagram two-factor verification manually and regenerate authentication state.";
+			case CONSENT_REQUIRED ->
+					"INSTAGRAM_CONSENT_REQUIRED: Complete Instagram consent or optional login dialog manually and regenerate authentication state.";
 			case RATE_LIMITED ->
 					"INSTAGRAM_RATE_LIMITED: Instagram temporarily limited authenticated access. Retry later.";
+			case TEMPORARILY_BLOCKED ->
+					"INSTAGRAM_TEMPORARILY_BLOCKED: Instagram temporarily blocked authenticated access. Retry later.";
 			case ACCOUNT_RESTRICTED ->
 					"INSTAGRAM_ACCOUNT_RESTRICTED: The authenticated Instagram account is restricted.";
 			case SUSPICIOUS_LOGIN ->

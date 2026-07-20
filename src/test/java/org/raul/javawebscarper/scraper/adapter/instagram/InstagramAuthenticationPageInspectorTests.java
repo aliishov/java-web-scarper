@@ -36,7 +36,30 @@ class InstagramAuthenticationPageInspectorTests {
 
 		assertThat(InstagramAuthenticationPageInspector.inspect(
 				"https://www.instagram.com/",
+				"<main>Your account was temporarily blocked from taking this action.</main>"
+		)).isEqualTo(InstagramAuthenticationStatus.TEMPORARILY_BLOCKED);
+
+		assertThat(InstagramAuthenticationPageInspector.inspect(
+				"https://www.instagram.com/",
 				"<main>Your account has been disabled.</main>"
 		)).isEqualTo(InstagramAuthenticationStatus.ACCOUNT_RESTRICTED);
+	}
+
+	@Test
+	void detectsTwoFactorSuspiciousAndConsentStates() {
+		assertThat(InstagramAuthenticationPageInspector.inspect(
+				"https://www.instagram.com/accounts/two_factor/",
+				"<main><input autocomplete='one-time-code'></main>"
+		)).isEqualTo(InstagramAuthenticationStatus.TWO_FACTOR_REQUIRED);
+
+		assertThat(InstagramAuthenticationPageInspector.inspect(
+				"https://www.instagram.com/",
+				"<main>Suspicious login attempt</main>"
+		)).isEqualTo(InstagramAuthenticationStatus.SUSPICIOUS_LOGIN);
+
+		assertThat(InstagramAuthenticationPageInspector.inspect(
+				"https://www.instagram.com/privacy/consent/",
+				"<main>Allow Instagram to use cookies</main>"
+		)).isEqualTo(InstagramAuthenticationStatus.CONSENT_REQUIRED);
 	}
 }
