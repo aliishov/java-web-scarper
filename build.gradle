@@ -76,3 +76,11 @@ tasks.register('facebookAuthStateInteractive', JavaExec) {
     mainClass = 'org.raul.javawebscarper.tools.facebookauth.FacebookAuthStateGenerator'
     standardInput = System.in
 }
+
+tasks.register('instagramAuthStateInteractive', JavaExec) {
+    group = 'authentication'
+    description = 'Creates Instagram Playwright storage state using interactive login.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.raul.javawebscarper.tools.instagramauth.InstagramAuthStateGenerator'
+    standardInput = System.in
+}
