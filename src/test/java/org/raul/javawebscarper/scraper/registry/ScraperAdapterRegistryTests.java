@@ -15,6 +15,11 @@ import org.raul.javawebscarper.scraper.adapter.facebook.FacebookProperties;
 import org.raul.javawebscarper.scraper.adapter.facebook.FacebookAuthenticationVerifier;
 import org.raul.javawebscarper.scraper.adapter.facebook.FacebookScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.facebook.FacebookSearchQueryBuilder;
+import org.raul.javawebscarper.scraper.adapter.instagram.InstagramAuthenticationVerifier;
+import org.raul.javawebscarper.scraper.adapter.instagram.InstagramDateParser;
+import org.raul.javawebscarper.scraper.adapter.instagram.InstagramProperties;
+import org.raul.javawebscarper.scraper.adapter.instagram.InstagramScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.instagram.InstagramSearchQueryBuilder;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzSearchPeriodResolver;
@@ -197,6 +202,25 @@ class ScraperAdapterRegistryTests {
 		assertThat(registry.findAdapter(Source.builder().code("META_FACEBOOK").build())).contains(facebookAdapter);
 		assertThat(registry.findAdapter(Source.builder().code("social").baseUrl("https://m.facebook.com/").build())).contains(facebookAdapter);
 		assertThat(registry.getRegisteredSourceCodes()).contains("FACEBOOK");
+	}
+
+	@Test
+	void findsInstagramAdapterByCurrentAndLegacySourceCodes() {
+		InstagramScraperAdapter instagramAdapter = new InstagramScraperAdapter(
+				null,
+				new InstagramProperties(),
+				new InstagramSearchQueryBuilder(),
+				new InstagramDateParser(),
+				new InstagramAuthenticationVerifier()
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(instagramAdapter, unsupportedAdapter), unsupportedAdapter);
+
+		assertThat(registry.findAdapter(Source.builder().code("INSTAGRAM").build())).contains(instagramAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("IG").build())).contains(instagramAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("INSTAGRAM_COM").build())).contains(instagramAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("META_INSTAGRAM").build())).contains(instagramAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("social").baseUrl("https://www.instagram.com/").build())).contains(instagramAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("INSTAGRAM");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {

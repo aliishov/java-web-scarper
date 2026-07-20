@@ -1,0 +1,14 @@
+package org.raul.javawebscarper.scraper.adapter.instagram;
+
+public enum InstagramAuthenticationStatus {
+	AUTHENTICATED,
+	AUTH_REQUIRED,
+	AUTH_STATE_MISSING,
+	AUTH_STATE_EXPIRED,
+	CHALLENGE_REQUIRED,
+	TWO_FACTOR_REQUIRED,
+	RATE_LIMITED,
+	ACCOUNT_RESTRICTED,
+	SUSPICIOUS_LOGIN,
+	UNKNOWN
+}
