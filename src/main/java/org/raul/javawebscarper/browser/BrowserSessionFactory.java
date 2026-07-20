@@ -74,10 +74,23 @@ public class BrowserSessionFactory {
 	}
 
 	private Path validateStorageStatePath(Path storageStatePath) {
-		if (!Files.isRegularFile(storageStatePath)) {
+		Path normalizedPath = storageStatePath.toAbsolutePath().normalize();
+		if (!Files.isRegularFile(normalizedPath)) {
 			throw new BrowserEngineException("Configured browser storage state file does not exist");
 		}
-		return storageStatePath;
+		if (!Files.isReadable(normalizedPath)) {
+			throw new BrowserEngineException("Configured browser storage state file is not readable");
+		}
+		try {
+			if (Files.size(normalizedPath) <= 0) {
+				throw new BrowserEngineException("Configured browser storage state file is empty");
+			}
+		} catch (BrowserEngineException exception) {
+			throw exception;
+		} catch (Exception exception) {
+			throw new BrowserEngineException("Configured browser storage state file cannot be inspected", exception);
+		}
+		return normalizedPath;
 	}
 
 	private void closeContextQuietly(BrowserContext context) {
