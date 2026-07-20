@@ -11,6 +11,8 @@ import org.raul.javawebscarper.scraper.adapter.instagram.InstagramAuthentication
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.Map;
 
 @RequiredArgsConstructor
@@ -65,10 +67,17 @@ public class InstagramAuthStateGenerator {
 	}
 
 	void validateAuthStatePath(Path authStatePath) {
+		Path normalizedPath = authStatePath.toAbsolutePath().normalize();
+		if (!normalizedPath.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".json")) {
+			throw new IllegalArgumentException("INSTAGRAM_AUTH_STATE_PATH must point to a JSON file.");
+		}
+		if (isForbiddenRepositoryPath(normalizedPath)) {
+			throw new IllegalArgumentException("INSTAGRAM_AUTH_STATE_PATH must not point to source, config, docs, or Git metadata files.");
+		}
 		if (Files.isDirectory(authStatePath)) {
 			throw new IllegalArgumentException("INSTAGRAM_AUTH_STATE_PATH must point to a file, not a directory.");
 		}
-		Path parent = authStatePath.getParent();
+		Path parent = normalizedPath.getParent();
 		if (parent == null) {
 			return;
 		}
@@ -81,10 +90,11 @@ public class InstagramAuthStateGenerator {
 
 	private void createStorageState(InstagramAuthStateRequest request) {
 		validateAuthStatePath(request.authStatePath());
-		boolean stateWriteAttempted = false;
+		Path temporaryStatePath = null;
 		try (Playwright playwright = Playwright.create();
 				Browser browser = playwright.chromium().launch(new com.microsoft.playwright.BrowserType.LaunchOptions()
 						.setHeadless(false))) {
+			temporaryStatePath = createTemporaryStatePath(request.authStatePath());
 			try (BrowserContext context = browser.newContext(contextOptions(request))) {
 				Page page = context.newPage();
 				page.navigate(request.loginUrl());
@@ -94,15 +104,15 @@ public class InstagramAuthStateGenerator {
 				if (!waitUntilAuthenticated(page, request.manualVerificationTimeoutMs())) {
 					throw new IllegalStateException("Instagram authentication did not complete before timeout.");
 				}
-				stateWriteAttempted = true;
-				context.storageState(new BrowserContext.StorageStateOptions().setPath(request.authStatePath()));
+				context.storageState(new BrowserContext.StorageStateOptions().setPath(temporaryStatePath));
 			}
-			validateSavedState(browser, request);
+			validateSavedState(browser, request, temporaryStatePath);
+			moveVerifiedState(temporaryStatePath, request.authStatePath());
+			temporaryStatePath = null;
 		} catch (RuntimeException exception) {
-			if (stateWriteAttempted) {
-				deleteInvalidState(request.authStatePath());
-			}
 			throw exception;
+		} finally {
+			deleteInvalidState(temporaryStatePath);
 		}
 	}
 
@@ -117,17 +127,16 @@ public class InstagramAuthStateGenerator {
 		return options;
 	}
 
-	private void validateSavedState(Browser browser, InstagramAuthStateRequest request) {
+	private void validateSavedState(Browser browser, InstagramAuthStateRequest request, Path statePath) {
 		try {
-			if (!Files.isRegularFile(request.authStatePath()) || Files.size(request.authStatePath()) <= 0) {
+			if (!Files.isRegularFile(statePath) || Files.size(statePath) <= 0) {
 				throw new IllegalStateException("Instagram authentication state file was not saved correctly.");
 			}
 		} catch (Exception exception) {
-			deleteInvalidState(request.authStatePath());
 			throw new IllegalStateException("Instagram authentication state file was not saved correctly.");
 		}
 		Browser.NewContextOptions options = contextOptions(request)
-				.setStorageStatePath(request.authStatePath());
+				.setStorageStatePath(statePath);
 		try (BrowserContext validationContext = browser.newContext(options)) {
 			Page validationPage = validationContext.newPage();
 			validationPage.navigate(request.authVerificationUrl());
@@ -137,7 +146,6 @@ public class InstagramAuthStateGenerator {
 					validationPage.content()
 			);
 			if (status != InstagramAuthenticationStatus.AUTHENTICATED) {
-				deleteInvalidState(request.authStatePath());
 				throw new IllegalStateException("Saved Instagram authentication state is not authenticated. Repeat instagramAuthStateInteractive.");
 			}
 		}
@@ -156,6 +164,7 @@ public class InstagramAuthStateGenerator {
 				previousStatus = status;
 			}
 			if (status == InstagramAuthenticationStatus.RATE_LIMITED
+					|| status == InstagramAuthenticationStatus.TEMPORARILY_BLOCKED
 					|| status == InstagramAuthenticationStatus.ACCOUNT_RESTRICTED) {
 				throw new IllegalStateException("Instagram returned " + status + "; cannot create a healthy storage state.");
 			}
@@ -166,6 +175,60 @@ public class InstagramAuthStateGenerator {
 
 	private Path normalizeAuthStatePath(String value) {
 		return Path.of(value).toAbsolutePath().normalize();
+	}
+
+	private boolean isForbiddenRepositoryPath(Path authStatePath) {
+		Path workingDirectory = Path.of("").toAbsolutePath().normalize();
+		if (!authStatePath.startsWith(workingDirectory)) {
+			return false;
+		}
+		Path relative = workingDirectory.relativize(authStatePath);
+		if (relative.getNameCount() == 0) {
+			return true;
+		}
+		String firstSegment = relative.getName(0).toString().toLowerCase(Locale.ROOT);
+		if (firstSegment.equals("src")
+				|| firstSegment.equals(".git")
+				|| firstSegment.equals("gradle")
+				|| firstSegment.equals("docs")
+				|| firstSegment.equals(".idea")) {
+			return true;
+		}
+		String fileName = authStatePath.getFileName().toString().toLowerCase(Locale.ROOT);
+		return fileName.equals("build.gradle")
+				|| fileName.equals("settings.gradle")
+				|| fileName.equals("application.yaml")
+				|| fileName.equals("application.yml")
+				|| fileName.equals("compose.yaml");
+	}
+
+	private Path createTemporaryStatePath(Path authStatePath) {
+		try {
+			Path parent = authStatePath.getParent();
+			if (parent == null) {
+				parent = Path.of("").toAbsolutePath().normalize();
+			}
+			return Files.createTempFile(parent, "instagram-storage-state-", ".json");
+		} catch (Exception exception) {
+			throw new IllegalStateException("Failed to create temporary Instagram authentication state file.");
+		}
+	}
+
+	private void moveVerifiedState(Path temporaryStatePath, Path targetPath) {
+		try {
+			Files.move(
+					temporaryStatePath,
+					targetPath,
+					StandardCopyOption.REPLACE_EXISTING,
+					StandardCopyOption.ATOMIC_MOVE
+			);
+		} catch (Exception atomicMoveException) {
+			try {
+				Files.move(temporaryStatePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+			} catch (Exception fallbackException) {
+				throw new IllegalStateException("Failed to save verified Instagram authentication state file.");
+			}
+		}
 	}
 
 	private String requiredEnv(String name) {

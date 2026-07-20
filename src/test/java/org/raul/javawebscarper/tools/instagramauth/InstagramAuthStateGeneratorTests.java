@@ -62,12 +62,35 @@ class InstagramAuthStateGeneratorTests {
 	}
 
 	@Test
-	void rejectsDirectoryAsAuthStatePath() {
+	void rejectsDirectoryAsAuthStatePath() throws Exception {
 		InstagramAuthStateGenerator generator = new InstagramAuthStateGenerator(Map.of(), output());
+		Path directoryPath = tempDir.resolve("directory.json");
+		Files.createDirectory(directoryPath);
 
-		assertThatThrownBy(() -> generator.validateAuthStatePath(tempDir))
+		assertThatThrownBy(() -> generator.validateAuthStatePath(directoryPath))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("must point to a file");
+	}
+
+	@Test
+	void rejectsNonJsonAuthStatePath() {
+		InstagramAuthStateGenerator generator = new InstagramAuthStateGenerator(Map.of(), output());
+
+		assertThatThrownBy(() -> generator.validateAuthStatePath(tempDir.resolve("instagram-storage-state.txt")))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("JSON file");
+	}
+
+	@Test
+	void rejectsRepositorySourceAndConfigPaths() {
+		InstagramAuthStateGenerator generator = new InstagramAuthStateGenerator(Map.of(), output());
+
+		assertThatThrownBy(() -> generator.validateAuthStatePath(Path.of("src/main/resources/instagram-storage-state.json")))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("must not point to source");
+		assertThatThrownBy(() -> generator.validateAuthStatePath(Path.of(".git/instagram-storage-state.json")))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("must not point to source");
 	}
 
 	@Test
