@@ -65,6 +65,11 @@ class TikTokAuthStateGeneratorTests {
 		assertThatThrownBy(() -> new TikTokAuthStateGenerator(notJson, new PrintStream(new ByteArrayOutputStream())).buildCommand())
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessageContaining("must point to a JSON file");
+
+		Map<String, String> currentDirectoryFile = Map.of("TIKTOK_AUTH_STATE_PATH", "tiktok-storage-state.json");
+		assertThatThrownBy(() -> new TikTokAuthStateGenerator(currentDirectoryFile, new PrintStream(new ByteArrayOutputStream())).buildCommand())
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("must not point to a file in the current directory");
 	}
 
 	@Test
