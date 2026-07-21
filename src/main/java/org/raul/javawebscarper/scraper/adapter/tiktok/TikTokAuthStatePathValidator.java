@@ -45,6 +45,7 @@ public final class TikTokAuthStatePathValidator {
 			throw new IllegalArgumentException("TIKTOK_AUTH_STATE_PATH must point to a JSON file.");
 		}
 		validateNotForbiddenRepositoryPath(normalizedPath);
+		validateNotCurrentDirectoryFile(normalizedPath);
 		if (Files.isDirectory(normalizedPath)) {
 			throw new IllegalArgumentException("TIKTOK_AUTH_STATE_PATH must point to a file, not a directory.");
 		}
@@ -84,6 +85,14 @@ public final class TikTokAuthStatePathValidator {
 				|| fileName.equals("compose.yaml")
 				|| fileName.equals("dockerfile")) {
 			throw forbiddenPath();
+		}
+	}
+
+	private static void validateNotCurrentDirectoryFile(Path statePath) {
+		Path workingDirectory = Path.of("").toAbsolutePath().normalize();
+		Path parent = statePath.getParent();
+		if (parent != null && parent.equals(workingDirectory)) {
+			throw new IllegalArgumentException("TIKTOK_AUTH_STATE_PATH must not point to a file in the current directory.");
 		}
 	}
 
