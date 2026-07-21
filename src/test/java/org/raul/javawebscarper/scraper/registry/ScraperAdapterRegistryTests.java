@@ -20,6 +20,12 @@ import org.raul.javawebscarper.scraper.adapter.instagram.InstagramDateParser;
 import org.raul.javawebscarper.scraper.adapter.instagram.InstagramProperties;
 import org.raul.javawebscarper.scraper.adapter.instagram.InstagramScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.instagram.InstagramSearchQueryBuilder;
+import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokAuthenticationVerifier;
+import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokDateParser;
+import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokPageReadinessVerifier;
+import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokProperties;
+import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokScraperAdapter;
+import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokSearchQueryBuilder;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzSearchPeriodResolver;
@@ -221,6 +227,26 @@ class ScraperAdapterRegistryTests {
 		assertThat(registry.findAdapter(Source.builder().code("META_INSTAGRAM").build())).contains(instagramAdapter);
 		assertThat(registry.findAdapter(Source.builder().code("social").baseUrl("https://www.instagram.com/").build())).contains(instagramAdapter);
 		assertThat(registry.getRegisteredSourceCodes()).contains("INSTAGRAM");
+	}
+
+	@Test
+	void findsTikTokAdapterByCurrentAndLegacySourceCodes() {
+		TikTokScraperAdapter tikTokAdapter = new TikTokScraperAdapter(
+				null,
+				new TikTokProperties(),
+				new TikTokSearchQueryBuilder(),
+				new TikTokDateParser(),
+				new TikTokAuthenticationVerifier(),
+				new TikTokPageReadinessVerifier()
+		);
+		ScraperAdapterRegistry registry = new ScraperAdapterRegistry(List.of(tikTokAdapter, unsupportedAdapter), unsupportedAdapter);
+
+		assertThat(registry.findAdapter(Source.builder().code("TIKTOK").build())).contains(tikTokAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("TT").build())).contains(tikTokAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("TIKTOK_COM").build())).contains(tikTokAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("BYTE_DANCE_TIKTOK").build())).contains(tikTokAdapter);
+		assertThat(registry.findAdapter(Source.builder().code("social").baseUrl("https://www.tiktok.com/").build())).contains(tikTokAdapter);
+		assertThat(registry.getRegisteredSourceCodes()).contains("TIKTOK");
 	}
 
 	private record TestScraperAdapter(String sourceCode) implements ScraperAdapter {
