@@ -445,11 +445,14 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 		return status == TikTokAuthenticationStatus.AUTH_REQUIRED
 				|| status == TikTokAuthenticationStatus.AUTH_STATE_MISSING
 				|| status == TikTokAuthenticationStatus.AUTH_STATE_EXPIRED
+				|| status == TikTokAuthenticationStatus.LOGIN_MODAL_BLOCKING
 				|| status == TikTokAuthenticationStatus.CAPTCHA_REQUIRED
 				|| status == TikTokAuthenticationStatus.VERIFICATION_REQUIRED
+				|| status == TikTokAuthenticationStatus.TWO_FACTOR_REQUIRED
 				|| status == TikTokAuthenticationStatus.RATE_LIMITED
 				|| status == TikTokAuthenticationStatus.TEMPORARILY_BLOCKED
-				|| status == TikTokAuthenticationStatus.ACCOUNT_RESTRICTED;
+				|| status == TikTokAuthenticationStatus.ACCOUNT_RESTRICTED
+				|| status == TikTokAuthenticationStatus.CONSENT_REQUIRED;
 	}
 
 	private boolean isHardReadinessFailure(TikTokPageReadinessStatus status) {
@@ -468,9 +471,9 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 			diagnostics.anonymousSession = true;
 		}
 		switch (status) {
-			case AUTH_REQUIRED, AUTH_STATE_EXPIRED -> diagnostics.loginModalDetected = true;
+			case AUTH_REQUIRED, AUTH_STATE_EXPIRED, LOGIN_MODAL_BLOCKING -> diagnostics.loginModalDetected = true;
 			case CAPTCHA_REQUIRED -> diagnostics.captchaDetected = true;
-			case VERIFICATION_REQUIRED -> diagnostics.verificationDetected = true;
+			case VERIFICATION_REQUIRED, TWO_FACTOR_REQUIRED -> diagnostics.verificationDetected = true;
 			case RATE_LIMITED, TEMPORARILY_BLOCKED -> diagnostics.rateLimitDetected = true;
 			default -> {
 			}
@@ -503,16 +506,22 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 					"TIKTOK_AUTH_STATE_MISSING: TikTok authentication state is not configured. Set TIKTOK_AUTH_STATE_PATH or disable authentication-required.";
 			case AUTH_REQUIRED, AUTH_STATE_EXPIRED ->
 					"TIKTOK_LOGIN_REQUIRED: TikTok requires login for this page/session. Authenticate manually and provide Playwright storage state.";
+			case LOGIN_MODAL_BLOCKING ->
+					"TIKTOK_LOGIN_MODAL_BLOCKING: TikTok showed a blocking login modal.";
 			case CAPTCHA_REQUIRED ->
 					"TIKTOK_CAPTCHA_REQUIRED: TikTok requires CAPTCHA. Complete it manually in a browser session; automated bypass is not supported.";
 			case VERIFICATION_REQUIRED ->
 					"TIKTOK_VERIFICATION_REQUIRED: TikTok requires account or security verification. Complete it manually.";
+			case TWO_FACTOR_REQUIRED ->
+					"TIKTOK_VERIFICATION_REQUIRED: TikTok requires two-factor verification. Complete it manually.";
 			case RATE_LIMITED ->
 					"TIKTOK_RATE_LIMITED: TikTok temporarily rate-limited this session. Retry later.";
 			case TEMPORARILY_BLOCKED ->
 					"TIKTOK_TEMPORARILY_BLOCKED: TikTok temporarily blocked this session. Retry later.";
 			case ACCOUNT_RESTRICTED ->
 					"TIKTOK_ACCOUNT_RESTRICTED: The TikTok account/session is restricted.";
+			case CONSENT_REQUIRED ->
+					"TIKTOK_VERIFICATION_REQUIRED: TikTok requires a consent or optional account dialog before scraping can continue.";
 			case UNKNOWN ->
 					"TIKTOK_AUTH_STATE_EXPIRED: TikTok authentication state could not be verified.";
 			case AUTHENTICATED, ANONYMOUS_ACCESS -> "TIKTOK_AUTHENTICATION_OK";

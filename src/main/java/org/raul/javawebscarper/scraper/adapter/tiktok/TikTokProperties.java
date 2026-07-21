@@ -19,11 +19,21 @@ public class TikTokProperties {
 	private String baseUrl = "https://www.tiktok.com";
 	@Size(max = 1024)
 	private String authStatePath = "";
+	private TikTokAuthenticationMode authenticationMode = TikTokAuthenticationMode.AUTO;
 	private boolean authenticationRequired = false;
+	@Size(max = 256)
+	private String loginUrl = "https://www.tiktok.com/login";
+	@Size(max = 256)
+	private String authVerificationUrl = "https://www.tiktok.com/";
+	@Positive
+	private long loginTimeoutMs = 60_000;
+	@Positive
+	private long manualVerificationTimeoutMs = 300_000;
 	@Size(max = 32)
 	private String locale = "en-US";
 	@Size(max = 64)
 	private String timezoneId = "Asia/Baku";
+	private boolean allowAnonymousFallback = true;
 	private TikTokSearchMode searchMode = TikTokSearchMode.AUTO;
 	@Positive
 	private long navigationTimeoutMs = 30_000;
