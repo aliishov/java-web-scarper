@@ -84,11 +84,3 @@ tasks.register('instagramAuthStateInteractive', JavaExec) {
     mainClass = 'org.raul.javawebscarper.tools.instagramauth.InstagramAuthStateGenerator'
     standardInput = System.in
 }
-
-tasks.register('tiktokAuthStateInteractive', JavaExec) {
-    group = 'authentication'
-    description = 'Creates TikTok Playwright storage state using interactive login.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.raul.javawebscarper.tools.tiktokauth.TikTokAuthStateGenerator'
-    standardInput = System.in
-}
