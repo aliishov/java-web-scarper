@@ -113,10 +113,6 @@ public final class TikTokScraperSupport {
 			diagnostics.captionFallbackUsed++;
 		}
 		List<ScrapedMediaDTO> media = extractMedia(root, document, diagnostics, properties);
-		if ((caption == null || caption.text().isBlank()) && !media.isEmpty()) {
-			diagnostics.captionEmpty++;
-		}
-
 		if (author == null || parsedDate == null || ((caption == null || caption.text().isBlank()) && media.isEmpty())) {
 			return Optional.empty();
 		}
