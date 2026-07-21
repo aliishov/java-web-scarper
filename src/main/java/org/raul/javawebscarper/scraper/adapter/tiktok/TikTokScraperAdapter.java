@@ -100,6 +100,11 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 			openSearchPage(searchPage, keyword.trim(), diagnostics);
 			TikTokPageReadinessStatus searchReadiness = readinessVerifier.verify(searchPage);
 			updateReadinessDiagnostics(searchReadiness, diagnostics);
+			if (searchReadiness == TikTokPageReadinessStatus.COOKIE_CONSENT) {
+				dismissCookieConsent(searchPage, diagnostics);
+				searchReadiness = readinessVerifier.verify(searchPage);
+				updateReadinessDiagnostics(searchReadiness, diagnostics);
+			}
 			if (isHardReadinessFailure(searchReadiness)) {
 				return failed(readinessFailureMessage(searchReadiness), diagnostics);
 			}
@@ -198,6 +203,11 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 				page.waitForTimeout(properties.getActionDelayMs());
 				TikTokPageReadinessStatus readiness = readinessVerifier.verify(page);
 				updateReadinessDiagnostics(readiness, diagnostics);
+				if (readiness == TikTokPageReadinessStatus.COOKIE_CONSENT) {
+					dismissCookieConsent(page, diagnostics);
+					readiness = readinessVerifier.verify(page);
+					updateReadinessDiagnostics(readiness, diagnostics);
+				}
 				if (isHardReadinessFailure(readiness)) {
 					throw new TikTokFlowException(readinessFailureMessage(readiness));
 				}
@@ -235,6 +245,28 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 				page.waitForTimeout(properties.getScrollDelayMs());
 			} catch (BrowserEngineException exception) {
 				log.debug("TikTok search submit button was not usable: {}", exception.getMessage());
+			}
+		}
+	}
+
+	private void dismissCookieConsent(BrowserPage page, TikTokScrapeDiagnostics diagnostics) {
+		diagnostics.cookieConsentDetected = true;
+		for (String selector : List.of(
+				"button:has-text('Accept all cookies')",
+				"button:has-text('Allow all cookies')",
+				"button:has-text('Accept')",
+				"button:has-text('Разрешить все')",
+				"button:has-text('Принять')",
+				"button:has-text('Qəbul et')",
+				"button:has-text('Kabul et')"
+		)) {
+			try {
+				page.click(selector);
+				page.waitForTimeout(properties.getActionDelayMs());
+				log.info("TikTok cookie consent dismissed with selector {}", selector);
+				return;
+			} catch (BrowserEngineException exception) {
+				log.debug("TikTok cookie consent selector was not usable: selector={}, message={}", selector, exception.getMessage());
 			}
 		}
 	}
