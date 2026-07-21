@@ -15,9 +15,15 @@ class TikTokPropertiesTests {
 				.withProperty("scraper.tiktok.enabled", "false")
 				.withProperty("scraper.tiktok.base-url", "https://www.tiktok.com")
 				.withProperty("scraper.tiktok.auth-state-path", "playwright/.auth/tiktok-storage-state.json")
+				.withProperty("scraper.tiktok.authentication-mode", "AUTHENTICATED")
 				.withProperty("scraper.tiktok.authentication-required", "true")
+				.withProperty("scraper.tiktok.login-url", "https://www.tiktok.com/login")
+				.withProperty("scraper.tiktok.auth-verification-url", "https://www.tiktok.com/")
+				.withProperty("scraper.tiktok.login-timeout-ms", "61000")
+				.withProperty("scraper.tiktok.manual-verification-timeout-ms", "310000")
 				.withProperty("scraper.tiktok.locale", "az-AZ")
 				.withProperty("scraper.tiktok.timezone-id", "Asia/Baku")
+				.withProperty("scraper.tiktok.allow-anonymous-fallback", "false")
 				.withProperty("scraper.tiktok.search-mode", "HASHTAG")
 				.withProperty("scraper.tiktok.navigation-timeout-ms", "31000")
 				.withProperty("scraper.tiktok.readiness-timeout-ms", "21000")
@@ -39,9 +45,15 @@ class TikTokPropertiesTests {
 		assertThat(properties.isEnabled()).isFalse();
 		assertThat(properties.getBaseUrl()).isEqualTo("https://www.tiktok.com");
 		assertThat(properties.getAuthStatePath()).isEqualTo("playwright/.auth/tiktok-storage-state.json");
+		assertThat(properties.getAuthenticationMode()).isEqualTo(TikTokAuthenticationMode.AUTHENTICATED);
 		assertThat(properties.isAuthenticationRequired()).isTrue();
+		assertThat(properties.getLoginUrl()).isEqualTo("https://www.tiktok.com/login");
+		assertThat(properties.getAuthVerificationUrl()).isEqualTo("https://www.tiktok.com/");
+		assertThat(properties.getLoginTimeoutMs()).isEqualTo(61_000);
+		assertThat(properties.getManualVerificationTimeoutMs()).isEqualTo(310_000);
 		assertThat(properties.getLocale()).isEqualTo("az-AZ");
 		assertThat(properties.getTimezoneId()).isEqualTo("Asia/Baku");
+		assertThat(properties.isAllowAnonymousFallback()).isFalse();
 		assertThat(properties.getSearchMode()).isEqualTo(TikTokSearchMode.HASHTAG);
 		assertThat(properties.getNavigationTimeoutMs()).isEqualTo(31_000);
 		assertThat(properties.getReadinessTimeoutMs()).isEqualTo(21_000);
@@ -64,7 +76,13 @@ class TikTokPropertiesTests {
 		assertThat(properties.isEnabled()).isTrue();
 		assertThat(properties.getBaseUrl()).isEqualTo("https://www.tiktok.com");
 		assertThat(properties.getAuthStatePath()).isEmpty();
+		assertThat(properties.getAuthenticationMode()).isEqualTo(TikTokAuthenticationMode.AUTO);
 		assertThat(properties.isAuthenticationRequired()).isFalse();
+		assertThat(properties.getLoginUrl()).isEqualTo("https://www.tiktok.com/login");
+		assertThat(properties.getAuthVerificationUrl()).isEqualTo("https://www.tiktok.com/");
+		assertThat(properties.getLoginTimeoutMs()).isEqualTo(60_000);
+		assertThat(properties.getManualVerificationTimeoutMs()).isEqualTo(300_000);
+		assertThat(properties.isAllowAnonymousFallback()).isTrue();
 		assertThat(properties.getSearchMode()).isEqualTo(TikTokSearchMode.AUTO);
 		assertThat(properties.isIncludeSponsored()).isFalse();
 		assertThat(properties.isIncludePhotoPosts()).isTrue();

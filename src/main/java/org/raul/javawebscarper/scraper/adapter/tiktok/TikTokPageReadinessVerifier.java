@@ -50,6 +50,8 @@ public class TikTokPageReadinessVerifier {
 		return text.contains("captcha")
 				|| text.contains("verify you are human")
 				|| text.contains("robot")
+				|| text.contains("slide to verify")
+				|| text.contains("drag the slider")
 				|| document.select("iframe[src*=captcha], iframe[src*=challenge], [id*=captcha], [class*=captcha], [data-e2e*=captcha]").size() > 0;
 	}
 
@@ -70,6 +72,7 @@ public class TikTokPageReadinessVerifier {
 				|| text.contains("temporarily blocked")
 				|| text.contains("temporarily unavailable")
 				|| text.contains("rate limit")
+				|| text.contains("access too frequent")
 				|| text.contains("слишком много попыток");
 	}
 

@@ -8,6 +8,10 @@ public class TikTokScrapeDiagnostics {
 	public boolean authStateUsed;
 	public TikTokAuthenticationStatus authenticationStatus;
 	public boolean anonymousSession;
+	public boolean anonymousFallbackUsed;
+	public boolean authenticationExpiredDuringRun;
+	public TikTokAuthenticationStatus authenticationStatusAtFailure;
+	public boolean anonymousAccessRevokedDuringRun;
 	public TikTokPageReadinessStatus pageReadinessStatus;
 	public int readinessAttempts;
 	public boolean cookieConsentDetected;
@@ -53,6 +57,12 @@ public class TikTokScrapeDiagnostics {
 			metadata.put("authenticationStatus", authenticationStatus.name());
 		}
 		metadata.put("anonymousSession", anonymousSession);
+		metadata.put("anonymousFallbackUsed", anonymousFallbackUsed);
+		metadata.put("authenticationExpiredDuringRun", authenticationExpiredDuringRun);
+		if (authenticationStatusAtFailure != null) {
+			metadata.put("authenticationStatusAtFailure", authenticationStatusAtFailure.name());
+		}
+		metadata.put("anonymousAccessRevokedDuringRun", anonymousAccessRevokedDuringRun);
 		if (pageReadinessStatus != null) {
 			metadata.put("pageReadinessStatus", pageReadinessStatus.name());
 		}
