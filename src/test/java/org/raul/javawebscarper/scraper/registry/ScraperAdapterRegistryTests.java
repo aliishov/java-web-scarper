@@ -26,6 +26,7 @@ import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokPageReadinessVerifie
 import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokProperties;
 import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokSearchQueryBuilder;
+import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokSessionResolver;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzDateParser;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzNewsScraperAdapter;
 import org.raul.javawebscarper.scraper.adapter.lentaz.LentAzSearchPeriodResolver;
@@ -232,7 +233,7 @@ class ScraperAdapterRegistryTests {
 	@Test
 	void findsTikTokAdapterByCurrentAndLegacySourceCodes() {
 		TikTokScraperAdapter tikTokAdapter = new TikTokScraperAdapter(
-				null,
+				new TikTokSessionResolver(null, new TikTokProperties(), new TikTokAuthenticationVerifier()),
 				new TikTokProperties(),
 				new TikTokSearchQueryBuilder(),
 				new TikTokDateParser(),

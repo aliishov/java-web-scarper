@@ -7,8 +7,6 @@ import org.jsoup.nodes.Document;
 import org.raul.javawebscarper.browser.BrowserEngineException;
 import org.raul.javawebscarper.browser.BrowserPage;
 import org.raul.javawebscarper.browser.BrowserSession;
-import org.raul.javawebscarper.browser.BrowserSessionFactory;
-import org.raul.javawebscarper.browser.BrowserSessionOptions;
 import org.raul.javawebscarper.dto.scraper.ScrapedPostDTO;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
@@ -18,8 +16,6 @@ import org.raul.javawebscarper.scraper.engine.ScraperExecutionStatus;
 import org.raul.javawebscarper.scraper.support.DateRangeValidator;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,7 +30,7 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 	private static final int MIN_KEYWORD_LENGTH = 1;
 	private static final int SCROLL_PIXELS = 1_100;
 
-	private final BrowserSessionFactory browserSessionFactory;
+	private final TikTokSessionResolver sessionResolver;
 	private final TikTokProperties properties;
 	private final TikTokSearchQueryBuilder searchQueryBuilder;
 	private final TikTokDateParser dateParser;
@@ -66,37 +62,28 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 		diagnostics.searchMode = searchQueryBuilder.resolveMode(keyword.trim(), properties.getSearchMode());
 		diagnostics.searchQuery = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword.trim(), properties.getSearchMode());
 
-		BrowserSessionOptions sessionOptions;
-		try {
-			sessionOptions = sessionOptions(diagnostics);
-		} catch (BrowserEngineException exception) {
-			log.warn("TikTok auth state is not usable: {}", exception.getMessage());
-			diagnostics.authenticationStatus = TikTokAuthenticationStatus.AUTH_STATE_MISSING;
-			return failed(authenticationFailureMessage(TikTokAuthenticationStatus.AUTH_STATE_MISSING), diagnostics);
-		}
-
 		log.info(
-				"Starting TikTok scraping: keyword={}, dateFrom={}, dateTo={}, mode={}, authStateUsed={}, maxScrollAttempts={}, maxPosts={}",
+				"Starting TikTok scraping: keyword={}, dateFrom={}, dateTo={}, mode={}, authMode={}, maxScrollAttempts={}, maxPosts={}",
 				keyword,
 				context.dateFrom(),
 				context.dateTo(),
 				diagnostics.searchMode,
-				diagnostics.authStateUsed,
+				properties.getAuthenticationMode(),
 				properties.getMaxScrollAttempts(),
 				context.maxPosts()
 		);
 
-		try (BrowserSession session = browserSessionFactory.createSession(sessionOptions)) {
-			BrowserPage searchPage = session.newPage();
-			if (properties.isAuthenticationRequired() || diagnostics.authStateUsed) {
-				TikTokAuthenticationStatus authenticationStatus = verifySession(searchPage);
-				diagnostics.authenticationStatus = authenticationStatus;
-				updateAuthenticationDiagnostics(authenticationStatus, diagnostics);
-				if (isHardAuthenticationFailure(authenticationStatus)) {
-					return failed(authenticationFailureMessage(authenticationStatus), diagnostics);
-				}
+		try (TikTokResolvedSession resolvedSession = sessionResolver.resolve()) {
+			diagnostics.authStateUsed = resolvedSession.storageStateUsed();
+			diagnostics.anonymousFallbackUsed = resolvedSession.anonymousFallbackUsed();
+			diagnostics.authenticationStatus = resolvedSession.authenticationStatus();
+			updateAuthenticationDiagnostics(resolvedSession.authenticationStatus(), diagnostics);
+			if (!isAllowedAuthenticationStatus(resolvedSession.authenticationStatus())) {
+				return failed(authenticationFailureMessage(resolvedSession.authenticationStatus()), diagnostics);
 			}
 
+			BrowserSession session = resolvedSession.session();
+			BrowserPage searchPage = session.newPage();
 			openSearchPage(searchPage, keyword.trim(), diagnostics);
 			TikTokPageReadinessStatus searchReadiness = readinessVerifier.verify(searchPage);
 			updateReadinessDiagnostics(searchReadiness, diagnostics);
@@ -160,6 +147,11 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 				return failed("TIKTOK_EXTRACTION_FAILED: candidates were found but no valid TikTok posts were extracted", diagnostics);
 			}
 			return ScraperExecutionResult.empty();
+		} catch (TikTokAuthenticationException exception) {
+			log.warn("TikTok authentication resolution failed: {}", exception.getMessage());
+			diagnostics.authenticationStatus = exception.status();
+			updateAuthenticationDiagnostics(exception.status(), diagnostics);
+			return failed(exception.getMessage(), diagnostics);
 		} catch (TikTokFlowException exception) {
 			log.warn("TikTok scraping stopped by blocker state: {}", exception.getMessage());
 			return failed(exception.getMessage(), diagnostics);
@@ -170,29 +162,6 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 			log.error("Unexpected TikTok scraping failure", exception);
 			return failed("TIKTOK_EXTRACTION_FAILED: " + exception.getMessage(), diagnostics);
 		}
-	}
-
-	private BrowserSessionOptions sessionOptions(TikTokScrapeDiagnostics diagnostics) {
-		String authStatePath = properties.getAuthStatePath();
-		if (authStatePath == null || authStatePath.isBlank()) {
-			if (properties.isAuthenticationRequired()) {
-				throw new BrowserEngineException("TikTok authentication state is not configured");
-			}
-			return new BrowserSessionOptions(null, properties.getLocale(), properties.getTimezoneId(), null, Map.of());
-		}
-		Path path = Path.of(authStatePath.trim()).toAbsolutePath().normalize();
-		if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
-			throw new BrowserEngineException("TikTok authentication state file is missing or unreadable");
-		}
-		diagnostics.authStateUsed = true;
-		return new BrowserSessionOptions(path, properties.getLocale(), properties.getTimezoneId(), null, Map.of());
-	}
-
-	private TikTokAuthenticationStatus verifySession(BrowserPage page) {
-		page.navigate(homeUrl());
-		page.waitForSelector(TikTokSelectors.BODY, properties.getReadinessTimeoutMs());
-		page.waitForTimeout(properties.getActionDelayMs());
-		return authenticationVerifier.verify(page);
 	}
 
 	private void openSearchPage(BrowserPage page, String keyword, TikTokScrapeDiagnostics diagnostics) {
@@ -302,12 +271,18 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 			TikTokPageReadinessStatus readiness = TikTokPageReadinessVerifier.inspect(page.url(), document.html());
 			updateReadinessDiagnostics(readiness, diagnostics);
 			if (isHardReadinessFailure(readiness)) {
+				diagnostics.authenticationExpiredDuringRun = true;
 				break;
 			}
 			TikTokAuthenticationStatus authenticationStatus = TikTokAuthenticationVerifier.inspect(page.url(), document.html());
 			diagnostics.authenticationStatus = authenticationStatus;
 			updateAuthenticationDiagnostics(authenticationStatus, diagnostics);
 			if (isHardAuthenticationFailure(authenticationStatus)) {
+				diagnostics.authenticationExpiredDuringRun = true;
+				diagnostics.authenticationStatusAtFailure = authenticationStatus;
+				if (!diagnostics.authStateUsed) {
+					diagnostics.anonymousAccessRevokedDuringRun = true;
+				}
 				break;
 			}
 			int before = candidates.size();
@@ -354,12 +329,18 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 				TikTokPageReadinessStatus readiness = TikTokPageReadinessVerifier.inspect(articlePage.url(), document.html());
 				updateReadinessDiagnostics(readiness, diagnostics);
 				if (isHardReadinessFailure(readiness)) {
+					diagnostics.authenticationExpiredDuringRun = true;
 					break;
 				}
 				TikTokAuthenticationStatus authenticationStatus = TikTokAuthenticationVerifier.inspect(articlePage.url(), document.html());
 				diagnostics.authenticationStatus = authenticationStatus;
 				updateAuthenticationDiagnostics(authenticationStatus, diagnostics);
 				if (isHardAuthenticationFailure(authenticationStatus)) {
+					diagnostics.authenticationExpiredDuringRun = true;
+					diagnostics.authenticationStatusAtFailure = authenticationStatus;
+					if (!diagnostics.authStateUsed) {
+						diagnostics.anonymousAccessRevokedDuringRun = true;
+					}
 					break;
 				}
 				TikTokScraperSupport.extractPost(document, context, candidate, dateParser, diagnostics, properties)
@@ -453,6 +434,10 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 				|| status == TikTokAuthenticationStatus.TEMPORARILY_BLOCKED
 				|| status == TikTokAuthenticationStatus.ACCOUNT_RESTRICTED
 				|| status == TikTokAuthenticationStatus.CONSENT_REQUIRED;
+	}
+
+	private boolean isAllowedAuthenticationStatus(TikTokAuthenticationStatus status) {
+		return status == TikTokAuthenticationStatus.AUTHENTICATED || status == TikTokAuthenticationStatus.ANONYMOUS_ACCESS;
 	}
 
 	private boolean isHardReadinessFailure(TikTokPageReadinessStatus status) {
