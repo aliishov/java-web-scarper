@@ -145,6 +145,32 @@ scraper:
     include-reels: ${SCRAPER_INSTAGRAM_INCLUDE_REELS:false}
     include-sponsored: ${SCRAPER_INSTAGRAM_INCLUDE_SPONSORED:false}
     open-post-for-details: ${SCRAPER_INSTAGRAM_OPEN_POST_FOR_DETAILS:true}
+  tiktok:
+    enabled: ${SCRAPER_TIKTOK_ENABLED:true}
+    base-url: ${SCRAPER_TIKTOK_BASE_URL:https://www.tiktok.com}
+    auth-state-path: ${TIKTOK_AUTH_STATE_PATH:}
+    authentication-mode: ${SCRAPER_TIKTOK_AUTHENTICATION_MODE:AUTO}
+    authentication-required: ${SCRAPER_TIKTOK_AUTHENTICATION_REQUIRED:false}
+    login-url: ${SCRAPER_TIKTOK_LOGIN_URL:https://www.tiktok.com/login}
+    auth-verification-url: ${SCRAPER_TIKTOK_AUTH_VERIFICATION_URL:https://www.tiktok.com/}
+    login-timeout-ms: ${SCRAPER_TIKTOK_LOGIN_TIMEOUT_MS:60000}
+    manual-verification-timeout-ms: ${SCRAPER_TIKTOK_MANUAL_VERIFICATION_TIMEOUT_MS:300000}
+    locale: ${SCRAPER_TIKTOK_LOCALE:en-US}
+    timezone-id: ${SCRAPER_TIKTOK_TIMEZONE_ID:Asia/Baku}
+    allow-anonymous-fallback: ${SCRAPER_TIKTOK_ALLOW_ANONYMOUS_FALLBACK:true}
+    search-mode: ${SCRAPER_TIKTOK_SEARCH_MODE:AUTO}
+    navigation-timeout-ms: ${SCRAPER_TIKTOK_NAVIGATION_TIMEOUT_MS:30000}
+    readiness-timeout-ms: ${SCRAPER_TIKTOK_READINESS_TIMEOUT_MS:20000}
+    search-timeout-ms: ${SCRAPER_TIKTOK_SEARCH_TIMEOUT_MS:20000}
+    post-open-timeout-ms: ${SCRAPER_TIKTOK_POST_OPEN_TIMEOUT_MS:20000}
+    max-scroll-attempts: ${SCRAPER_TIKTOK_MAX_SCROLL_ATTEMPTS:30}
+    no-new-post-limit: ${SCRAPER_TIKTOK_NO_NEW_POST_LIMIT:4}
+    max-candidates: ${SCRAPER_TIKTOK_MAX_CANDIDATES:100}
+    action-delay-ms: ${SCRAPER_TIKTOK_ACTION_DELAY_MS:500}
+    scroll-delay-ms: ${SCRAPER_TIKTOK_SCROLL_DELAY_MS:1300}
+    open-post-for-details: ${SCRAPER_TIKTOK_OPEN_POST_FOR_DETAILS:true}
+    include-sponsored: ${SCRAPER_TIKTOK_INCLUDE_SPONSORED:false}
+    include-photo-posts: ${SCRAPER_TIKTOK_INCLUDE_PHOTO_POSTS:true}
 
 springdoc:
   api-docs:
