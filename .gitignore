@@ -51,8 +51,6 @@ facebook-auth*.json
 facebook-storage-state*.json
 instagram-auth*.json
 instagram-storage-state*.json
-tiktok-auth*.json
-tiktok-storage-state*.json
 **/auth-state*.json
 **/storage-state*.json
 **/x-auth*.json
@@ -60,5 +58,3 @@ tiktok-storage-state*.json
 **/facebook-storage-state*.json
 **/instagram-auth*.json
 **/instagram-storage-state*.json
-**/tiktok-auth*.json
-**/tiktok-storage-state*.json
