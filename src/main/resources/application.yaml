@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:${SOCIAL_AUTH_SECRETS_FILE:./local/auth/social-auth.local.properties}
   application:
     name: ${SPRING_APPLICATION_NAME:java-web-scarper}
 
@@ -46,6 +48,50 @@ server:
   port: ${SERVER_PORT:8080}
 
 scraper:
+  auth:
+    bootstrap-enabled: ${SOCIAL_AUTH_BOOTSTRAP_ENABLED:true}
+    fail-startup-if-auth-fails: ${SOCIAL_AUTH_FAIL_STARTUP:false}
+    state-dir: ${SOCIAL_AUTH_STATE_DIR:./local/auth}
+    x:
+      enabled: ${SCRAPER_AUTH_X_ENABLED:true}
+      login: ${X_LOGIN:}
+      password: ${X_PASSWORD:}
+      auth-state-path: ${X_AUTH_STATE_PATH:}
+      authentication-required: true
+      login-url: https://x.com/i/flow/login
+      validation-url: https://x.com/home
+    tiktok:
+      enabled: ${SCRAPER_AUTH_TIKTOK_ENABLED:true}
+      login: ${TIKTOK_LOGIN:}
+      password: ${TIKTOK_PASSWORD:}
+      auth-state-path: ${TIKTOK_AUTH_STATE_PATH:}
+      authentication-required: true
+      login-url: https://www.tiktok.com/login
+      validation-url: https://www.tiktok.com/
+    instagram:
+      enabled: ${SCRAPER_AUTH_INSTAGRAM_ENABLED:true}
+      login: ${INSTAGRAM_LOGIN:}
+      password: ${INSTAGRAM_PASSWORD:}
+      auth-state-path: ${INSTAGRAM_AUTH_STATE_PATH:}
+      authentication-required: true
+      login-url: https://www.instagram.com/accounts/login/
+      validation-url: https://www.instagram.com/
+    facebook:
+      enabled: ${SCRAPER_AUTH_FACEBOOK_ENABLED:true}
+      login: ${FACEBOOK_LOGIN:}
+      password: ${FACEBOOK_PASSWORD:}
+      auth-state-path: ${FACEBOOK_AUTH_STATE_PATH:}
+      authentication-required: true
+      login-url: https://www.facebook.com/login
+      validation-url: https://www.facebook.com/
+    threads:
+      enabled: ${SCRAPER_AUTH_THREADS_ENABLED:true}
+      login: ${THREADS_LOGIN:}
+      password: ${THREADS_PASSWORD:}
+      auth-state-path: ${THREADS_AUTH_STATE_PATH:}
+      authentication-required: true
+      login-url: https://www.threads.net/login
+      validation-url: https://www.threads.net/
   default-time-zone: ${SCRAPER_DEFAULT_TIME_ZONE:Asia/Baku}
   scheduler:
     enabled: ${SCRAPER_SCHEDULER_ENABLED:true}
@@ -84,7 +130,7 @@ scraper:
   x:
     enabled: ${SCRAPER_X_ENABLED:true}
     base-url: ${SCRAPER_X_BASE_URL:https://x.com}
-    auth-state-path: ${X_AUTH_STATE_PATH:}
+    auth-state-path: ${X_AUTH_STATE_PATH:${SOCIAL_AUTH_STATE_DIR:./local/auth}/x-storage-state.json}
     login-url: ${SCRAPER_X_LOGIN_URL:https://x.com/i/flow/login}
     login-timeout-ms: ${SCRAPER_X_LOGIN_TIMEOUT_MS:60000}
     authentication-required: ${SCRAPER_X_AUTHENTICATION_REQUIRED:true}
@@ -100,7 +146,7 @@ scraper:
   facebook:
     enabled: ${SCRAPER_FACEBOOK_ENABLED:true}
     base-url: ${SCRAPER_FACEBOOK_BASE_URL:https://www.facebook.com/}
-    auth-state-path: ${FACEBOOK_AUTH_STATE_PATH:}
+    auth-state-path: ${FACEBOOK_AUTH_STATE_PATH:${SOCIAL_AUTH_STATE_DIR:./local/auth}/facebook-storage-state.json}
     authentication-required: ${SCRAPER_FACEBOOK_AUTHENTICATION_REQUIRED:true}
     login-url: ${SCRAPER_FACEBOOK_LOGIN_URL:https://www.facebook.com/login}
     auth-verification-url: ${SCRAPER_FACEBOOK_AUTH_VERIFICATION_URL:https://www.facebook.com/}
@@ -125,7 +171,7 @@ scraper:
   instagram:
     enabled: ${SCRAPER_INSTAGRAM_ENABLED:true}
     base-url: ${SCRAPER_INSTAGRAM_BASE_URL:https://www.instagram.com}
-    auth-state-path: ${INSTAGRAM_AUTH_STATE_PATH:}
+    auth-state-path: ${INSTAGRAM_AUTH_STATE_PATH:${SOCIAL_AUTH_STATE_DIR:./local/auth}/instagram-storage-state.json}
     authentication-required: ${SCRAPER_INSTAGRAM_AUTHENTICATION_REQUIRED:true}
     login-url: ${SCRAPER_INSTAGRAM_LOGIN_URL:https://www.instagram.com/accounts/login/}
     auth-verification-url: ${SCRAPER_INSTAGRAM_AUTH_VERIFICATION_URL:https://www.instagram.com/}
@@ -148,7 +194,7 @@ scraper:
   tiktok:
     enabled: ${SCRAPER_TIKTOK_ENABLED:true}
     base-url: ${SCRAPER_TIKTOK_BASE_URL:https://www.tiktok.com}
-    auth-state-path: ${TIKTOK_AUTH_STATE_PATH:}
+    auth-state-path: ${TIKTOK_AUTH_STATE_PATH:${SOCIAL_AUTH_STATE_DIR:./local/auth}/tiktok-storage-state.json}
     authentication-mode: ${SCRAPER_TIKTOK_AUTHENTICATION_MODE:AUTO}
     authentication-required: ${SCRAPER_TIKTOK_AUTHENTICATION_REQUIRED:false}
     login-url: ${SCRAPER_TIKTOK_LOGIN_URL:https://www.tiktok.com/login}

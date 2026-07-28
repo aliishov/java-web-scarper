@@ -92,3 +92,11 @@ tasks.register('tiktokAuthStateInteractive', JavaExec) {
     mainClass = 'org.raul.javawebscarper.tools.tiktokauth.TikTokAuthStateGenerator'
     standardInput = System.in
 }
+
+tasks.register('threadsAuthStateInteractive', JavaExec) {
+    group = 'authentication'
+    description = 'Creates Threads Playwright storage state using interactive login.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.raul.javawebscarper.tools.threadsauth.ThreadsAuthStateGenerator'
+    standardInput = System.in
+}
