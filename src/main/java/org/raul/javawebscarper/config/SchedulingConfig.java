@@ -1,6 +1,7 @@
 package org.raul.javawebscarper.config;
 
 import org.raul.javawebscarper.browser.BrowserEngineProperties;
+import org.raul.javawebscarper.auth.SocialAuthProperties;
 import org.raul.javawebscarper.scraper.adapter.facebook.FacebookProperties;
 import org.raul.javawebscarper.scraper.adapter.instagram.InstagramProperties;
 import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokProperties;
@@ -19,6 +20,7 @@ import java.time.Clock;
 		DailyScrapingProperties.class,
 		ScraperEngineProperties.class,
 		BrowserEngineProperties.class,
+		SocialAuthProperties.class,
 		FacebookProperties.class,
 		InstagramProperties.class,
 		TikTokProperties.class,

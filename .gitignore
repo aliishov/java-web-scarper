@@ -61,3 +61,10 @@ tiktok-storage-state*.json
 **/instagram-storage-state*.json
 **/tiktok-auth*.json
 **/tiktok-storage-state*.json
+/local/auth/social-auth.local.properties
+/local/auth/*storage-state*.json
+/local/auth/auth-state*.json
+*.local.properties
+!/local/auth/social-auth.local.example.properties
+*storage-state*.json
+auth-state*.json
