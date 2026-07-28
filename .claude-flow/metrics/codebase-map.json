@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-07-22T14:21:26.971Z",
+  "projectRoot": "/home/mehemmed/Desktop/Projects/java-web-scarper",
+  "structure": {
+    "hasPackageJson": false,
+    "hasTsConfig": false,
+    "hasClaudeConfig": false,
+    "hasClaudeFlow": true
+  },
+  "scannedAt": 1784730086971
+}

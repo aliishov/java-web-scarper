@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-07-22T14:27:26.922Z",
+  "distillationEnabled": true,
+  "patternsConsolidated": 0,
+  "memoryCleaned": 0,
+  "duplicatesRemoved": 0,
+  "episodes": 0,
+  "patternEmbeddings": 0,
+  "causalEdges": 0,
+  "promoted": 0,
+  "byProvenance": {},
+  "namespaces": [],
+  "dryRun": false,
+  "corrupt": false,
+  "skipped": "error: Could not locate the bindings file. Tried:\n → /usr/lib/build/better_sqlite3.node\n → /usr/lib/build/Debug/better_sqlite3.node\n → /usr/lib/build/Release/better_sqlite3.node\n → /usr/lib/out/Debug/better_sqlite3.node\n → /usr/lib/Debug/better_sqlite3.node\n → /usr/lib/out/Release/better_sqlite3.node\n → /usr/lib/Release/better_sqlite3.node\n → /usr/lib/build/default/better_sqlite3.node\n → /usr/lib/compiled/26.4.0/linux/x64/better_sqlite3.node\n → /usr/lib/addon-build/release/install-root/better_sqlite3.node\n → /usr/lib/addon-build/debug/install-root/better_sqlite3.node\n → /usr/lib/addon-build/default/install-root/better_sqlite3.node\n → /usr/lib/lib/binding/node-v147-linux-x64/better_sqlite3.node"
+}

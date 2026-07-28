@@ -1,0 +1,5 @@
+{
+  "timestamp": "2026-07-22T09:03:26.548Z",
+  "ran": false,
+  "error": "Cannot find module '/usr/lib/node_modules/ruflo/node_modules/@claude-flow/cli/dist/src/services/harness-flywheel-runtime.js' imported from /usr/lib/node_modules/ruflo/node_modules/@claude-flow/cli/dist/src/services/worker-daemon.js"
+}
