@@ -33,10 +33,6 @@ services:
       DB_NAME: ${DB_NAME:-scarper_db}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      JWT_SECRET: ${JWT_SECRET:-local-development-jwt-secret-change-before-production}
-      JWT_ISSUER: ${JWT_ISSUER:-java-web-scarper}
-      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
-      JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL:-30d}
       SERVER_PORT: 8080
       SCRAPER_SCHEDULER_ENABLED: ${SCRAPER_SCHEDULER_ENABLED:-true}
       SCRAPER_SCHEDULER_MAX_JOBS_PER_RUN: ${SCRAPER_SCHEDULER_MAX_JOBS_PER_RUN:-100}
@@ -48,7 +44,7 @@ services:
       SCRAPER_X_ENABLED: ${SCRAPER_X_ENABLED:-true}
       X_AUTH_STATE_PATH: ${X_AUTH_STATE_PATH:-}
     ports:
-      - '${APP_PORT:-8081}:8080'
+      - '${APP_PORT:-8080}:8080'
     networks:
       - scarper
 

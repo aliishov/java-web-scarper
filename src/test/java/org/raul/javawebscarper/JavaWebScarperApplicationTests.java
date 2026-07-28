@@ -3,8 +3,6 @@ package org.raul.javawebscarper;
 import org.junit.jupiter.api.Test;
 import org.raul.javawebscarper.orchestrator.ScrapeJobOrchestrator;
 import org.raul.javawebscarper.service.AuthorService;
-import org.raul.javawebscarper.service.AdminService;
-import org.raul.javawebscarper.service.AuthService;
 import org.raul.javawebscarper.service.KeywordService;
 import org.raul.javawebscarper.service.PostService;
 import org.raul.javawebscarper.service.ScrapeJobService;
@@ -21,19 +19,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 				+ "org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration,"
 				+ "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration",
 		"spring.jpa.hibernate.ddl-auto=none",
-		"security.jwt.secret=test-secret-that-is-longer-than-thirty-two-characters",
 		"scraper.browser.enabled=false"
 })
 class JavaWebScarperApplicationTests {
 
 	@MockitoBean
 	private SourceService sourceService;
-
-	@MockitoBean
-	private AuthService authService;
-
-	@MockitoBean
-	private AdminService adminService;
 
 	@MockitoBean
 	private KeywordService keywordService;

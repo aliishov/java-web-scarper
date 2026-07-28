@@ -58,16 +58,6 @@ public class GlobalExceptionHandler {
 		return build(HttpStatus.BAD_REQUEST, exception.getMessage(), null);
 	}
 
-	@ExceptionHandler(UnauthorizedException.class)
-	public ResponseEntity<BaseResponseDTO<Void>> handleUnauthorized(UnauthorizedException exception) {
-		return build(HttpStatus.UNAUTHORIZED, exception.getMessage(), null);
-	}
-
-	@ExceptionHandler(ForbiddenException.class)
-	public ResponseEntity<BaseResponseDTO<Void>> handleForbidden(ForbiddenException exception) {
-		return build(HttpStatus.FORBIDDEN, exception.getMessage(), null);
-	}
-
 	@ExceptionHandler(DataIntegrityViolationException.class)
 	public ResponseEntity<BaseResponseDTO<Void>> handleDataIntegrity(DataIntegrityViolationException exception) {
 		return build(HttpStatus.CONFLICT, "Request violates data integrity constraints", null);

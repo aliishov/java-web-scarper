@@ -4,8 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.raul.javawebscarper.orchestrator.ScrapeJobOrchestrator;
 import org.raul.javawebscarper.service.AuthorService;
-import org.raul.javawebscarper.service.AdminService;
-import org.raul.javawebscarper.service.AuthService;
 import org.raul.javawebscarper.service.KeywordService;
 import org.raul.javawebscarper.service.PostService;
 import org.raul.javawebscarper.service.ScrapeJobService;
@@ -25,7 +23,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
 @SpringBootTest(properties = {
 		"spring.autoconfigure.exclude="
@@ -34,7 +31,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 				+ "org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration,"
 				+ "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration",
 		"spring.jpa.hibernate.ddl-auto=none",
-		"security.jwt.secret=test-secret-that-is-longer-than-thirty-two-characters",
 		"springdoc.api-docs.enabled=true",
 		"springdoc.api-docs.path=/v3/api-docs",
 		"springdoc.swagger-ui.enabled=true",
@@ -47,12 +43,6 @@ class OpenApiDocumentationTests {
 
 	@MockitoBean
 	private SourceService sourceService;
-
-	@MockitoBean
-	private AuthService authService;
-
-	@MockitoBean
-	private AdminService adminService;
 
 	@MockitoBean
 	private KeywordService keywordService;
@@ -79,9 +69,7 @@ class OpenApiDocumentationTests {
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-				.apply(springSecurity())
-				.build();
+		mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
 	}
 
 	@Test
@@ -101,12 +89,5 @@ class OpenApiDocumentationTests {
 		mockMvc.perform(get("/swagger-ui/index.html"))
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("Swagger UI")));
-	}
-
-	@Test
-	void apiEndpointsRequireAuthentication() throws Exception {
-		mockMvc.perform(get("/api/sources"))
-				.andExpect(status().isUnauthorized())
-				.andExpect(jsonPath("$.success").value(false));
 	}
 }
