@@ -38,10 +38,7 @@ abstract class AbstractSocialLoginHandler implements SocialLoginHandler {
 			try (BrowserContext context = browser.newContext()) {
 				Page page = context.newPage();
 				page.navigate(account.getLoginUrl());
-				fill(page, loginSelector(), account.getLogin());
-				fill(page, passwordSelector(), account.getPassword());
-				Locator submit = page.locator(submitSelector()).first();
-				if (submit.count() > 0) submit.click(); else page.locator(passwordSelector()).first().press("Enter");
+				performLogin(page, account);
 				page.waitForTimeout(3_000);
 				AuthStateStatus immediate = challengeStatus(page);
 				if (immediate == AuthStateStatus.CHALLENGE_REQUIRED) {
@@ -60,6 +57,17 @@ abstract class AbstractSocialLoginHandler implements SocialLoginHandler {
 		}
 	}
 
+	protected void performLogin(Page page, SocialAuthAccountProperties account) {
+		fill(page, loginSelector(), account.getLogin());
+		fill(page, passwordSelector(), account.getPassword());
+		clickOrSubmit(page);
+	}
+
+	protected void clickOrSubmit(Page page) {
+		Locator submit = page.locator(submitSelector()).first();
+		if (submit.count() > 0) submit.click(); else page.locator(passwordSelector()).first().press("Enter");
+	}
+
 	protected AuthStateStatus challengeStatus(Page page) {
 		String content = page.content().toLowerCase();
 		return content.contains("captcha") || content.contains("two-factor") || content.contains("verification code")
@@ -67,7 +75,7 @@ abstract class AbstractSocialLoginHandler implements SocialLoginHandler {
 				? AuthStateStatus.CHALLENGE_REQUIRED : AuthStateStatus.AUTH_REQUIRED;
 	}
 
-	private void fill(Page page, String selector, String value) {
+	protected void fill(Page page, String selector, String value) {
 		Locator locator = page.locator(selector).first();
 		locator.waitFor(new Locator.WaitForOptions().setTimeout(30_000));
 		locator.fill(value);
