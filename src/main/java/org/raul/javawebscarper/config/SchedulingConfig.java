@@ -5,6 +5,7 @@ import org.raul.javawebscarper.auth.SocialAuthProperties;
 import org.raul.javawebscarper.scraper.adapter.facebook.FacebookProperties;
 import org.raul.javawebscarper.scraper.adapter.instagram.InstagramProperties;
 import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokProperties;
+import org.raul.javawebscarper.scraper.adapter.threads.ThreadsProperties;
 import org.raul.javawebscarper.scraper.adapter.xcom.XComProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ import java.time.Clock;
 		FacebookProperties.class,
 		InstagramProperties.class,
 		TikTokProperties.class,
+		ThreadsProperties.class,
 		XComProperties.class
 })
 public class SchedulingConfig {

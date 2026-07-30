@@ -198,6 +198,21 @@ scraper:
     include-reels: ${SCRAPER_INSTAGRAM_INCLUDE_REELS:false}
     include-sponsored: ${SCRAPER_INSTAGRAM_INCLUDE_SPONSORED:false}
     open-post-for-details: ${SCRAPER_INSTAGRAM_OPEN_POST_FOR_DETAILS:true}
+  threads:
+    enabled: ${SCRAPER_THREADS_ENABLED:true}
+    base-url: ${SCRAPER_THREADS_BASE_URL:https://www.threads.com}
+    auth-state-path: ${THREADS_AUTH_STATE_PATH:${SOCIAL_AUTH_STATE_DIR:./local/auth}/threads-storage-state.json}
+    authentication-required: ${SCRAPER_THREADS_AUTHENTICATION_REQUIRED:true}
+    locale: ${SCRAPER_THREADS_LOCALE:en-US}
+    timezone-id: ${SCRAPER_THREADS_TIMEZONE_ID:Asia/Baku}
+    login-timeout-ms: ${SCRAPER_THREADS_LOGIN_TIMEOUT_MS:60000}
+    timeline-load-timeout-ms: ${SCRAPER_THREADS_TIMELINE_LOAD_TIMEOUT_MS:20000}
+    post-open-timeout-ms: ${SCRAPER_THREADS_POST_OPEN_TIMEOUT_MS:15000}
+    action-delay-ms: ${SCRAPER_THREADS_ACTION_DELAY_MS:500}
+    scroll-delay-ms: ${SCRAPER_THREADS_SCROLL_DELAY_MS:1200}
+    max-scroll-attempts: ${SCRAPER_THREADS_MAX_SCROLL_ATTEMPTS:30}
+    no-new-post-limit: ${SCRAPER_THREADS_NO_NEW_POST_LIMIT:4}
+    max-candidates: ${SCRAPER_THREADS_MAX_CANDIDATES:200}
   tiktok:
     enabled: ${SCRAPER_TIKTOK_ENABLED:true}
     base-url: ${SCRAPER_TIKTOK_BASE_URL:https://www.tiktok.com}
