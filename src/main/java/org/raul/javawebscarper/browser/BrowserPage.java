@@ -7,6 +7,8 @@ import com.microsoft.playwright.TimeoutError;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
@@ -21,11 +23,29 @@ public class BrowserPage implements AutoCloseable {
 	private final BrowserEngineProperties properties;
 
 	public void navigate(String url) {
-		execute("navigate", () -> {
-			log.debug("Navigating browser page to {}", url);
-			page.navigate(url, new Page.NavigateOptions().setTimeout(properties.getNavigationTimeoutMs()));
-			return null;
-		});
+		String loggableUrl = loggableUrl(url);
+		long startedAt = System.nanoTime();
+		log.info("Browser navigation started: url={}", loggableUrl);
+		try {
+			execute("navigate", () -> {
+				page.navigate(url, new Page.NavigateOptions().setTimeout(properties.getNavigationTimeoutMs()));
+				return null;
+			});
+			log.info(
+					"Browser navigation completed: url={}, finalUrl={}, durationMs={}",
+					loggableUrl,
+					loggableUrl(page.url()),
+					elapsedMillis(startedAt)
+			);
+		} catch (RuntimeException exception) {
+			log.warn(
+					"Browser navigation failed: url={}, durationMs={}, error={}",
+					loggableUrl,
+					elapsedMillis(startedAt),
+					exception.getMessage()
+			);
+			throw exception;
+		}
 	}
 
 	public void waitForSelector(String selector) {
@@ -172,5 +192,29 @@ public class BrowserPage implements AutoCloseable {
 	private boolean isTimeout(PlaywrightException exception) {
 		String message = exception.getMessage();
 		return message != null && message.toLowerCase(Locale.ROOT).contains("timeout");
+	}
+
+	private String loggableUrl(String url) {
+		if (url == null) {
+			return null;
+		}
+		try {
+			URI uri = new URI(url);
+			return new URI(
+					uri.getScheme(),
+					null,
+					uri.getHost(),
+					uri.getPort(),
+					uri.getPath(),
+					null,
+					null
+			).toString();
+		} catch (URISyntaxException exception) {
+			return "<invalid-url>";
+		}
+	}
+
+	private long elapsedMillis(long startedAt) {
+		return (System.nanoTime() - startedAt) / 1_000_000;
 	}
 }

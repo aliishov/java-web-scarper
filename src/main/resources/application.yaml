@@ -231,6 +231,8 @@ springdoc:
     - /api/**
 
 logging:
+  pattern:
+    console: "${LOG_CONSOLE_PATTERN:%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [%X{requestId:-system}] %logger{36} - %msg%n}"
   level:
     org.raul.javawebscarper: ${APP_LOG_LEVEL:INFO}
     org.flywaydb: ${FLYWAY_LOG_LEVEL:INFO}
