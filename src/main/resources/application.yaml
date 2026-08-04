@@ -47,6 +47,13 @@ management:
 server:
   port: ${SERVER_PORT:8080}
 
+security:
+  jwt:
+    secret: ${JWT_SECRET:local-development-jwt-secret-change-before-production}
+    issuer: ${JWT_ISSUER:java-web-scarper}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL:30d}
+
 scraper:
   auth:
     bootstrap-enabled: ${SOCIAL_AUTH_BOOTSTRAP_ENABLED:true}
