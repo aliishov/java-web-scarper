@@ -9,7 +9,8 @@ import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class FacebookDateParserTests {
+class
+FacebookDateParserTests {
 
 	private static final ZoneId BAKU = ZoneId.of("Asia/Baku");
 	private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-07-17T08:00:00Z"), BAKU);
@@ -30,6 +31,7 @@ class FacebookDateParserTests {
 		assertThat(parser.parse("Yesterday at 13:40")).contains(OffsetDateTime.parse("2026-07-16T13:40:00+04:00"));
 		assertThat(parser.parse("Today at 13:40")).contains(OffsetDateTime.parse("2026-07-17T13:40:00+04:00"));
 		assertThat(parser.parse("Wednesday, June 17, 2026 at 9:28 PM")).contains(OffsetDateTime.parse("2026-06-17T21:28:00+04:00"));
+		assertThat(parser.parse("July 16 at 9:28 PM")).contains(OffsetDateTime.parse("2026-07-16T21:28:00+04:00"));
 	}
 
 	@Test

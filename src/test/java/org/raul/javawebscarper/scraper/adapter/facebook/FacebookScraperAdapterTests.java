@@ -132,6 +132,38 @@ class FacebookScraperAdapterTests {
 	}
 
 	@Test
+	void extractsDateFromPlainPostPermalinkText() {
+		Element article = article("""
+				<article>
+				  <div data-ad-rendering-role="profile_name"><a role="link" href="/example">Example Page</a></div>
+				  <a href="/example/posts/123456789">2 h</a>
+				  <div data-ad-rendering-role="story_message">OpenAI update</div>
+				</article>
+				""");
+
+		FacebookScraperAdapter.ParseAttempt attempt = adapter.parseContainer(article, context(Language.EN), "openai", new FacebookScrapeDiagnostics());
+
+		assertThat(attempt.candidate()).isNotNull();
+		assertThat(attempt.candidate().postDate()).isEqualTo(OffsetDateTime.parse("2026-07-17T10:00:00+04:00"));
+	}
+
+	@Test
+	void extractsDateFromModernSharePostLink() {
+		Element article = article("""
+				<article>
+				  <div data-ad-rendering-role="profile_name"><a role="link" href="/example">Example Page</a></div>
+				  <a href="/share/p/1AbCdEfgHi/">2 h</a>
+				  <div data-ad-rendering-role="story_message">OpenAI update</div>
+				</article>
+				""");
+
+		FacebookScraperAdapter.ParseAttempt attempt = adapter.parseContainer(article, context(Language.EN), "openai", new FacebookScrapeDiagnostics());
+
+		assertThat(attempt.candidate()).isNotNull();
+		assertThat(attempt.candidate().postUrl()).isEqualTo("https://www.facebook.com/share/p/1AbCdEfgHi");
+	}
+
+	@Test
 	void skipsSponsoredAndReelsByDefault() {
 		Element sponsored = article("""
 				<article>

@@ -51,6 +51,9 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, "/api/admins/**")
 						.hasAnyRole("ADMIN", "SUPER_ADMIN")
 						.requestMatchers("/api/admins/**").hasRole("SUPER_ADMIN")
+						.requestMatchers(HttpMethod.GET, "/api/social-auth/**")
+						.hasAnyRole("ADMIN", "SUPER_ADMIN")
+						.requestMatchers("/api/social-auth/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
 						.requestMatchers("/api/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(resourceServer -> resourceServer

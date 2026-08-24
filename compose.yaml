@@ -44,12 +44,15 @@ services:
       SCRAPER_X_ENABLED: ${SCRAPER_X_ENABLED:-true}
       X_AUTH_STATE_PATH: ${X_AUTH_STATE_PATH:-}
     ports:
-      - '${APP_PORT:-8080}:8080'
+      - '${APP_PORT:-8082}:8080'
+    volumes:
+      - social_auth_state:/app/local/auth
     networks:
       - scarper
 
 volumes:
   postgres_data:
+  social_auth_state:
 
 networks:
   scarper:

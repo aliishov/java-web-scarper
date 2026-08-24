@@ -33,6 +33,6 @@ class BrowserPageTests {
 		assertThatThrownBy(browserPage::content)
 				.isInstanceOf(BrowserEngineException.class)
 				.isNotInstanceOf(BrowserTimeoutException.class)
-				.hasMessage("Browser action failed during content");
+				.hasMessage("Browser action failed during content: Page crashed");
 	}
 }

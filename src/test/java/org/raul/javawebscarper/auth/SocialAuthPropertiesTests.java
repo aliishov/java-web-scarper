@@ -15,4 +15,9 @@ class SocialAuthPropertiesTests {
 		assertThat(properties.statePath(SocialPlatform.THREADS).toString().replace('\\', '/'))
 				.endsWith("local/auth-test/threads-storage-state.json");
 	}
+
+	@Test
+	void allowsFiveMinutesForInteractiveLoginByDefault() {
+		assertThat(new SocialAuthProperties().getInteractiveLoginTimeoutMs()).isEqualTo(300_000);
+	}
 }

@@ -30,8 +30,8 @@ public class InstagramSearchQueryBuilder {
 	}
 
 	public boolean hashtagFallbackAllowed(String keyword) {
-		String value = keyword == null ? "" : keyword.trim();
-		return value.startsWith("#") && !normalizeHashtag(value).isBlank();
+		String hashtag = normalizeHashtag(keyword);
+		return !hashtag.isBlank() && hashtag.matches("[\\p{L}\\p{N}_]{1,100}");
 	}
 
 	private String normalizeHashtag(String keyword) {

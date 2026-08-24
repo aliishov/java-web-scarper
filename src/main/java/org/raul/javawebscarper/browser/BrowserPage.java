@@ -23,12 +23,21 @@ public class BrowserPage implements AutoCloseable {
 	private final BrowserEngineProperties properties;
 
 	public void navigate(String url) {
+		navigate(url, null);
+	}
+
+	/** Navigates while retaining the originating page as the HTTP Referer when provided. */
+	public void navigate(String url, String referer) {
 		String loggableUrl = loggableUrl(url);
 		long startedAt = System.nanoTime();
 		log.info("Browser navigation started: url={}", loggableUrl);
 		try {
 			execute("navigate", () -> {
-				page.navigate(url, new Page.NavigateOptions().setTimeout(properties.getNavigationTimeoutMs()));
+				Page.NavigateOptions options = new Page.NavigateOptions().setTimeout(properties.getNavigationTimeoutMs());
+				if (referer != null && !referer.isBlank()) {
+					options.setReferer(referer);
+				}
+				page.navigate(url, options);
 				return null;
 			});
 			log.info(
@@ -64,6 +73,53 @@ public class BrowserPage implements AutoCloseable {
 		execute("click", () -> {
 			log.debug("Clicking selector {}", selector);
 			page.click(selector, new Page.ClickOptions().setTimeout(properties.getActionTimeoutMs()));
+			return null;
+		});
+	}
+
+	public boolean clickLinkByHref(String href) {
+		return execute("clickLinkByHref", () -> {
+			log.debug("Clicking link by href {}", href);
+			Object clicked = page.evaluate("""
+					href => {
+						const target = String(href || '');
+						if (!target) {
+							return false;
+						}
+						let absolute;
+						try {
+							absolute = new URL(target, window.location.origin).href;
+						} catch {
+							return false;
+						}
+						const targetPath = new URL(absolute).pathname.replace(/\\/$/, '');
+						const link = Array.from(document.querySelectorAll('a[href]')).find(anchor => {
+							const rawHref = anchor.getAttribute('href') || '';
+							let anchorAbsolute;
+							try {
+								anchorAbsolute = new URL(rawHref, window.location.origin).href;
+							} catch {
+								return false;
+							}
+							const anchorPath = new URL(anchorAbsolute).pathname.replace(/\\/$/, '');
+							return rawHref === target || anchorAbsolute === absolute || anchorPath === targetPath;
+						});
+						if (!link) {
+							return false;
+						}
+						link.scrollIntoView({ block: 'center', inline: 'center' });
+						link.click();
+						return true;
+					}
+					""", href);
+			return Boolean.TRUE.equals(clicked);
+		});
+	}
+
+	public void goBack() {
+		execute("goBack", () -> {
+			log.debug("Navigating browser page back");
+			page.goBack(new Page.GoBackOptions().setTimeout(properties.getNavigationTimeoutMs()));
 			return null;
 		});
 	}
@@ -185,7 +241,7 @@ public class BrowserPage implements AutoCloseable {
 			if (isTimeout(exception)) {
 				throw new BrowserTimeoutException("Browser timeout during " + action, exception);
 			}
-			throw new BrowserEngineException("Browser action failed during " + action, exception);
+			throw new BrowserEngineException("Browser action failed during " + action + ": " + exception.getMessage(), exception);
 		}
 	}
 

@@ -14,12 +14,14 @@ import java.util.Map;
 public class SocialAuthProperties {
 	private boolean bootstrapEnabled = true;
 	private boolean failStartupIfAuthFails = false;
+	/** Time available for an admin to finish CAPTCHA, 2FA, or another interactive login step. */
+	private long interactiveLoginTimeoutMs = 300_000;
 	private Path stateDir = Path.of("./local/auth");
 	private SocialAuthAccountProperties x = account("https://x.com/i/flow/login", "https://x.com/home");
 	private SocialAuthAccountProperties tiktok = account("https://www.tiktok.com/login", "https://www.tiktok.com/");
 	private SocialAuthAccountProperties instagram = account("https://www.instagram.com/accounts/login/", "https://www.instagram.com/");
 	private SocialAuthAccountProperties facebook = account("https://www.facebook.com/login", "https://www.facebook.com/");
-	private SocialAuthAccountProperties threads = account("https://www.threads.net/login", "https://www.threads.net/");
+	private SocialAuthAccountProperties threads = account("https://www.threads.com/login", "https://www.threads.com/");
 
 	public SocialAuthAccountProperties account(SocialPlatform platform) {
 		return switch (platform) {

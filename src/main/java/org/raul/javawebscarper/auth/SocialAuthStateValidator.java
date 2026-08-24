@@ -26,11 +26,15 @@ public class SocialAuthStateValidator {
 	private final SocialAuthProperties properties;
 
 	public SocialAuthResult validate(SocialPlatform platform) {
+		return validate(platform, properties.statePath(platform));
+	}
+
+	/** Validates a candidate state before it replaces the active platform session. */
+	public SocialAuthResult validate(SocialPlatform platform, Path path) {
 		SocialAuthAccountProperties account = properties.account(platform);
 		if (!account.isEnabled()) {
 			return result(platform, AuthStateStatus.DISABLED, "Authentication bootstrap is disabled for platform");
 		}
-		Path path = properties.statePath(platform);
 		try {
 			if (!Files.isRegularFile(path) || !Files.isReadable(path) || Files.size(path) == 0) {
 				return result(platform, AuthStateStatus.MISSING, "Authentication state file is missing or unreadable");
@@ -42,13 +46,18 @@ public class SocialAuthStateValidator {
 			BrowserPage page = session.getPage();
 			page.navigate(account.getValidationUrl());
 			page.waitForTimeout(1_500);
-			return inspect(platform, page.url(), page.content());
+			return inspectCurrentPage(platform, page.url(), page.content());
 		} catch (RuntimeException exception) {
 			return result(platform, AuthStateStatus.EXPIRED, "Authentication state validation failed");
 		}
 	}
 
-	private SocialAuthResult inspect(SocialPlatform platform, String url, String html) {
+	/**
+	 * Inspects the already-open interactive login page without creating another
+	 * browser session. This keeps the administrator's login window stable while
+	 * its authentication state is being monitored.
+	 */
+	public SocialAuthResult inspectCurrentPage(SocialPlatform platform, String url, String html) {
 		return switch (platform) {
 			case X -> fromX(XAuthenticationPageInspector.inspect(url, html));
 			case TIKTOK -> fromTikTok(TikTokAuthenticationVerifier.inspect(url, html));

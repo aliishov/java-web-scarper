@@ -6,6 +6,7 @@ import org.raul.javawebscarper.config.DailyScrapingProperties;
 import org.raul.javawebscarper.config.ScrapeSchedulerProperties;
 import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
@@ -19,6 +20,7 @@ import org.raul.javawebscarper.service.ScrapeJobService;
 import org.raul.javawebscarper.service.SourceLanguageSupportService;
 import org.raul.javawebscarper.service.SourceService;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -26,6 +28,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
@@ -41,6 +46,8 @@ public class ScrapeJobOrchestrator {
 	private final DailyScrapingProperties dailyProperties;
 	private final PreviousDayDateRangeResolver previousDayDateRangeResolver;
 	private final SourceLanguageSupportService sourceLanguageSupportService;
+	@Qualifier("scrapeJobExecutor")
+	private final Executor scrapeJobExecutor;
 
 	public ScheduledScrapeRunResponseDTO createAndRunScheduledJobs() {
 		OffsetDateTime startedAt = OffsetDateTime.now(schedulerClock);
@@ -152,6 +159,41 @@ public class ScrapeJobOrchestrator {
 				startedAt,
 				finishedAt
 		);
+	}
+
+	/** Runs one manually created job and always persists a terminal status. */
+	public ScrapeJobResponseDTO runManualJob(UUID jobId) {
+		ScrapeJob runningJob = scrapeJobService.markRunning(jobId);
+		try {
+			ScraperResult result = scraperRunner.run(runningJob);
+			scrapeJobService.markSuccess(jobId, result.postsFound(), result.postsSaved());
+		} catch (Exception exception) {
+			log.error("Manual scrape job failed: jobId={}", jobId, exception);
+			scrapeJobService.markFailed(jobId, exception.getMessage());
+		}
+		return scrapeJobService.findById(jobId);
+	}
+
+	/** Starts a manual job without holding the administrator's HTTP request open. */
+	public ScrapeJobResponseDTO startManualJob(UUID jobId) {
+		scrapeJobService.markRunning(jobId);
+		CompletableFuture.runAsync(() -> runManualJobInBackground(jobId), scrapeJobExecutor);
+		return scrapeJobService.findById(jobId);
+	}
+
+	private void runManualJobInBackground(UUID jobId) {
+		try {
+			ScrapeJob job = scrapeJobService.getEntityWithSourceAndKeyword(jobId);
+			ScraperResult result = scraperRunner.run(job);
+			scrapeJobService.markSuccess(jobId, result.postsFound(), result.postsSaved());
+		} catch (Exception exception) {
+			log.error("Manual scrape job failed: jobId={}", jobId, exception);
+			try {
+				scrapeJobService.markFailed(jobId, exception.getMessage());
+			} catch (Exception statusException) {
+				log.error("Could not mark manual scrape job as FAILED: jobId={}", jobId, statusException);
+			}
+		}
 	}
 
 	private RunCounters createAndRunJobs(

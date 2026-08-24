@@ -18,6 +18,8 @@ import org.raul.javawebscarper.scraper.engine.ScraperExecutionStatus;
 import org.raul.javawebscarper.scraper.support.DateRangeValidator;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -65,6 +67,7 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 		String searchUrl = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword.trim(), properties.getSearchMode());
 		diagnostics.searchQuery = searchUrl;
 		diagnostics.hashtagFallbackUsed = diagnostics.searchMode == InstagramSearchMode.HASHTAG && !keyword.trim().startsWith("#");
+		long deadlineNanos = System.nanoTime() + properties.getMaxRunDurationMs() * 1_000_000L;
 
 		BrowserSessionOptions sessionOptions;
 		try {
@@ -106,11 +109,27 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 				return failed(authenticationFailureMessage(searchPageStatus), diagnostics);
 			}
 
-			List<InstagramPostCandidate> candidates = collectCandidates(searchPage, context, diagnostics);
+			List<InstagramPostCandidate> candidates = collectCandidates(searchPage, context, diagnostics, deadlineNanos);
+			if (candidates.isEmpty()
+					&& diagnostics.searchMode == InstagramSearchMode.KEYWORD
+					&& !diagnostics.timedOut
+					&& searchQueryBuilder.hashtagFallbackAllowed(keyword.trim())) {
+				candidates = collectHashtagFallbackCandidates(searchPage, context, keyword.trim(), diagnostics, deadlineNanos);
+			}
 			if (candidates.isEmpty()) {
 				return emptyOrGridFailure(searchPage, diagnostics);
 			}
-			List<ScrapedPostDTO> posts = collectPosts(session, searchPage, context, candidates, diagnostics);
+			List<ScrapedPostDTO> posts = collectPosts(searchPage, context, candidates, diagnostics, deadlineNanos);
+			if (posts.isEmpty()
+					&& diagnostics.searchMode == InstagramSearchMode.KEYWORD
+					&& !diagnostics.timedOut
+					&& searchQueryBuilder.hashtagFallbackAllowed(keyword.trim())) {
+				log.info("Instagram keyword candidates produced no in-range posts; trying hashtag fallback: keyword={}", keyword);
+				candidates = collectHashtagFallbackCandidates(searchPage, context, keyword.trim(), diagnostics, deadlineNanos);
+				if (!candidates.isEmpty()) {
+					posts = collectPosts(searchPage, context, candidates, diagnostics, deadlineNanos);
+				}
+			}
 
 			log.info(
 					"Finished Instagram scraping: keyword={}, postsCollected={}, candidates={}, duplicates={}, reelsSkipped={}, "
@@ -145,6 +164,28 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 			log.error("Unexpected Instagram scraping failure", exception);
 			return failed("INSTAGRAM_EXTRACTION_FAILED: " + exception.getMessage(), diagnostics);
 		}
+	}
+
+	private List<InstagramPostCandidate> collectHashtagFallbackCandidates(
+			BrowserPage page,
+			ScraperExecutionContext context,
+			String keyword,
+			InstagramScrapeDiagnostics diagnostics,
+			long deadlineNanos
+	) {
+		if (isRunTimedOut(deadlineNanos, diagnostics)) {
+			return List.of();
+		}
+		String hashtagUrl = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword, InstagramSearchMode.HASHTAG);
+		log.info("Trying Instagram hashtag fallback: keyword={}, url={}", keyword, hashtagUrl);
+		diagnostics.searchMode = InstagramSearchMode.HASHTAG;
+		diagnostics.hashtagFallbackUsed = true;
+		diagnostics.searchQuery = hashtagUrl;
+		diagnostics.noNewPostIterations = 0;
+		page.navigate(hashtagUrl);
+		page.waitForSelector(InstagramSelectors.BODY, properties.getTimelineLoadTimeoutMs());
+		page.waitForTimeout(properties.getActionDelayMs());
+		return collectCandidates(page, context, diagnostics, deadlineNanos);
 	}
 
 	private BrowserSessionOptions sessionOptions(InstagramScrapeDiagnostics diagnostics) {
@@ -204,14 +245,17 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 	private List<InstagramPostCandidate> collectCandidates(
 			BrowserPage page,
 			ScraperExecutionContext context,
-			InstagramScrapeDiagnostics diagnostics
+			InstagramScrapeDiagnostics diagnostics,
+			long deadlineNanos
 	) {
 		LinkedHashMap<String, InstagramPostCandidate> candidates = new LinkedHashMap<>();
-		int maxCandidates = Math.min(properties.getMaxCandidates(), Math.max(context.maxPosts() * 3, context.maxPosts()));
+		int targetMaxPosts = effectiveMaxPosts(context);
+		int maxCandidates = Math.min(properties.getMaxCandidates(), Math.max(targetMaxPosts * 3, targetMaxPosts));
 		for (int attempt = 0;
 				attempt < Math.min(properties.getMaxScrollAttempts(), context.maxPages() * properties.getMaxScrollAttempts())
 						&& candidates.size() < maxCandidates
-						&& diagnostics.noNewPostIterations < properties.getNoNewPostLimit();
+						&& diagnostics.noNewPostIterations < properties.getNoNewPostLimit()
+						&& !isRunTimedOut(deadlineNanos, diagnostics);
 				attempt++) {
 			Document document = Jsoup.parse(page.content(), page.url() == null ? InstagramScraperSupport.BASE_URL : page.url());
 			InstagramAuthenticationStatus pageStatus = InstagramAuthenticationPageInspector.inspect(page.url(), document.html());
@@ -248,25 +292,26 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 	}
 
 	private List<ScrapedPostDTO> collectPosts(
-			BrowserSession session,
 			BrowserPage searchPage,
 			ScraperExecutionContext context,
 			List<InstagramPostCandidate> candidates,
-			InstagramScrapeDiagnostics diagnostics
+			InstagramScrapeDiagnostics diagnostics,
+			long deadlineNanos
 	) {
 		List<ScrapedPostDTO> posts = new ArrayList<>();
-		for (InstagramPostCandidate candidate : candidates) {
-			if (posts.size() >= context.maxPosts()) {
+		String searchUrl = searchPage.url();
+		int tooOldAtStart = diagnostics.tooOldSkipped;
+		int targetMaxPosts = effectiveMaxPosts(context);
+		for (int candidateIndex = 0; candidateIndex < candidates.size(); candidateIndex++) {
+			if (posts.size() >= targetMaxPosts || isRunTimedOut(deadlineNanos, diagnostics)) {
 				break;
 			}
-			BrowserPage articlePage = null;
-			boolean closeArticlePage = false;
+			InstagramPostCandidate candidate = candidates.get(candidateIndex);
+			BrowserPage articlePage = searchPage;
 			try {
-				articlePage = properties.isOpenPostForDetails() ? session.openNewPage() : searchPage;
-				closeArticlePage = properties.isOpenPostForDetails();
 				diagnostics.postsOpened++;
-				articlePage.navigate(candidate.postUrl());
-				articlePage.waitForSelector(InstagramSelectors.BODY, properties.getPostOpenTimeoutMs());
+				openCandidateFromSearchPage(searchPage, candidate, searchUrl);
+				articlePage.waitForSelector(InstagramSelectors.POST_ROOT, properties.getPostOpenTimeoutMs());
 				articlePage.waitForTimeout(properties.getActionDelayMs());
 				Document document = Jsoup.parse(articlePage.content(), candidate.postUrl());
 				InstagramAuthenticationStatus pageStatus = InstagramAuthenticationPageInspector.inspect(articlePage.url(), document.html());
@@ -279,21 +324,122 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 				InstagramScraperSupport.extractPost(document, context, candidate, dateParser, diagnostics, properties)
 						.map(post -> withDiagnostics(post, diagnostics))
 						.ifPresent(post -> addIfInRange(post, posts, context, diagnostics));
+				if (posts.isEmpty()
+						&& diagnostics.tooOldSkipped - tooOldAtStart >= targetMaxPosts) {
+					log.info(
+							"Stopping Instagram candidate checks after consecutive out-of-range older posts: keyword={}, checked={}, tooOld={}",
+							context.keyword().getWord(),
+							candidateIndex + 1,
+							diagnostics.tooOldSkipped - tooOldAtStart
+					);
+					break;
+				}
 			} catch (BrowserEngineException exception) {
 				diagnostics.postLoadFailures++;
-				log.warn("Instagram post load failed: postUrl={}, message={}", candidate.postUrl(), exception.getMessage());
+				diagnostics.extractionFailures++;
+				log.warn(
+						"Instagram post load failed: postUrl={}, message={}, pageSummary={}",
+						candidate.postUrl(),
+						exception.getMessage(),
+						pageSummary(articlePage)
+				);
 			} finally {
-				if (closeArticlePage && articlePage != null) {
-					try {
-						articlePage.close();
-					} catch (BrowserEngineException exception) {
-						log.warn("Failed to close Instagram article page cleanly: {}", exception.getMessage());
-					}
-				}
+				returnToSearchPage(searchPage, searchUrl);
 			}
 		}
 		diagnostics.postsCollected = posts.size();
 		return posts;
+	}
+
+	private void openCandidateFromSearchPage(BrowserPage searchPage, InstagramPostCandidate candidate, String searchUrl) {
+		searchPage.navigate(searchUrl);
+		searchPage.waitForSelector(InstagramSelectors.BODY, properties.getTimelineLoadTimeoutMs());
+		searchPage.waitForTimeout(properties.getActionDelayMs());
+		String href = relativePostHref(candidate.postUrl());
+		if (!clickSearchResultLink(searchPage, href, candidate.postUrl())) {
+			throw new BrowserEngineException("Instagram search result link was not found for " + candidate.postUrl());
+		}
+		searchPage.waitForTimeout(properties.getActionDelayMs());
+	}
+
+	private boolean clickSearchResultLink(BrowserPage searchPage, String href, String postUrl) {
+		int maxAttempts = Math.min(properties.getMaxScrollAttempts(), properties.getMaxPostLinkScrollAttempts());
+		for (int attempt = 0; attempt <= maxAttempts; attempt++) {
+			if (searchPage.clickLinkByHref(href) || searchPage.clickLinkByHref(postUrl)) {
+				return true;
+			}
+			if (attempt < maxAttempts) {
+				searchPage.scrollBy(SCROLL_PIXELS, properties.getScrollDelayMs());
+			}
+		}
+		return false;
+	}
+
+	private int effectiveMaxPosts(ScraperExecutionContext context) {
+		return Math.min(context.maxPosts(), properties.getMaxPostsPerRun());
+	}
+
+	private boolean isRunTimedOut(long deadlineNanos, InstagramScrapeDiagnostics diagnostics) {
+		if (System.nanoTime() < deadlineNanos) {
+			return false;
+		}
+		if (!diagnostics.timedOut) {
+			diagnostics.timedOut = true;
+			log.warn("Instagram scraping run timed out after {}ms", properties.getMaxRunDurationMs());
+		}
+		return true;
+	}
+
+	private void returnToSearchPage(BrowserPage searchPage, String searchUrl) {
+		try {
+			searchPage.goBack();
+			searchPage.waitForSelector(InstagramSelectors.BODY, properties.getTimelineLoadTimeoutMs());
+			searchPage.waitForTimeout(properties.getActionDelayMs());
+		} catch (BrowserEngineException exception) {
+			log.warn("Instagram search page back navigation failed; reopening search page: {}", exception.getMessage());
+			try {
+				searchPage.navigate(searchUrl);
+				searchPage.waitForSelector(InstagramSelectors.BODY, properties.getTimelineLoadTimeoutMs());
+				searchPage.waitForTimeout(properties.getActionDelayMs());
+			} catch (BrowserEngineException reopenException) {
+				log.warn("Instagram search page reopen failed after post attempt: {}", reopenException.getMessage());
+			}
+		}
+	}
+
+	private String pageSummary(BrowserPage page) {
+		if (page == null) {
+			return "<no-page>";
+		}
+		try {
+			Document document = Jsoup.parse(page.content(), page.url());
+			String text = document.text();
+			if (text.length() > 300) {
+				text = text.substring(0, 300);
+			}
+			return "url=%s,title=%s,main=%d,roleMain=%d,article=%d,time=%d,links=%d,text=%s".formatted(
+					page.url(),
+					document.title(),
+					document.select("main").size(),
+					document.select("[role='main']").size(),
+					document.select("article").size(),
+					document.select("time").size(),
+					document.select("a[href]").size(),
+					text
+			);
+		} catch (BrowserEngineException exception) {
+			return "<unavailable: " + exception.getMessage() + ">";
+		}
+	}
+
+	private String relativePostHref(String postUrl) {
+		try {
+			URI uri = new URI(postUrl);
+			String path = uri.getPath();
+			return path == null || path.isBlank() ? postUrl : path;
+		} catch (URISyntaxException exception) {
+			return postUrl;
+		}
 	}
 
 	private void addIfInRange(

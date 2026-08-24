@@ -44,11 +44,11 @@ public class TikTokProperties {
 	@Positive
 	private long postOpenTimeoutMs = 20_000;
 	@Positive
-	private int maxScrollAttempts = 30;
+	private int maxScrollAttempts = 80;
 	@Positive
-	private int noNewPostLimit = 4;
+	private int noNewPostLimit = 10;
 	@Positive
-	private int maxCandidates = 100;
+	private int maxCandidates = 1_000;
 	@PositiveOrZero
 	private long actionDelayMs = 500;
 	@PositiveOrZero

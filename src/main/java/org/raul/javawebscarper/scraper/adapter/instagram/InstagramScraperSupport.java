@@ -292,11 +292,18 @@ public final class InstagramScraperSupport {
 
 	private static int postRootScore(Element element) {
 		int score = 0;
+		if (isBroadPostContainer(element) && !element.select("article").isEmpty()) {
+			score -= 100;
+		}
 		score += element.select(InstagramSelectors.TIME).isEmpty() ? 0 : 5;
 		score += element.select("header a[href], a[role='link'][href]").isEmpty() ? 0 : 3;
 		score += element.select("img[src], video").isEmpty() ? 0 : 2;
 		score += element.select("h1[dir='auto'], [data-testid='post-comment-root']").isEmpty() ? 0 : 2;
 		return score;
+	}
+
+	private static boolean isBroadPostContainer(Element element) {
+		return element.normalName().equals("main") || "main".equalsIgnoreCase(element.attr("role"));
 	}
 
 	private static boolean isSponsored(Element root) {

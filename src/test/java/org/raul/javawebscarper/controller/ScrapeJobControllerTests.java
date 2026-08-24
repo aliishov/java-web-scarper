@@ -8,12 +8,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.raul.javawebscarper.dto.common.BaseResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 import org.raul.javawebscarper.orchestrator.ScrapeJobOrchestrator;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -87,5 +92,22 @@ class ScrapeJobControllerTests {
 		assertThat(response.getBody().getData().dateTo())
 				.isEqualTo(OffsetDateTime.parse("2026-07-07T23:59:59.999999999+04:00"));
 		verify(scrapeJobOrchestrator).createAndRunDailyPreviousDayJobs();
+	}
+
+	@Test
+	void runStartsPendingManualJobInBackground() {
+		UUID jobId = UUID.randomUUID();
+		ScrapeJobResponseDTO completed = new ScrapeJobResponseDTO(
+				jobId, 1, "INSTAGRAM", 1, "baku", LocalDate.of(2026, 8, 4), LocalDate.of(2026, 8, 4),
+				ScrapeJobRunType.MANUAL, ScrapeJobStatus.SUCCESS, OffsetDateTime.now(), OffsetDateTime.now(),
+				2, 2, null, OffsetDateTime.now(), OffsetDateTime.now());
+		when(scrapeJobOrchestrator.startManualJob(jobId)).thenReturn(completed);
+
+		ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> response = controller.run(jobId);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+		assertThat(response.getBody()).isNotNull();
+		assertThat(response.getBody().getData()).isEqualTo(completed);
+		verify(scrapeJobOrchestrator).startManualJob(jobId);
 	}
 }

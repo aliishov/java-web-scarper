@@ -34,9 +34,9 @@ public class FacebookProperties {
 	private String timezoneId = "Asia/Baku";
 	private FacebookSearchMode searchMode = FacebookSearchMode.RECENT;
 	@Positive
-	private int maxScrollAttempts = 30;
+	private int maxScrollAttempts = 80;
 	@Positive
-	private int noNewPostLimit = 4;
+	private int noNewPostLimit = 10;
 	@PositiveOrZero
 	private long scrollDelayMs = 1_400;
 	private boolean includeSponsored = false;

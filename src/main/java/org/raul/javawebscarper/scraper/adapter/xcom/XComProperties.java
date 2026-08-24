@@ -29,11 +29,11 @@ public class XComProperties {
 	private boolean includeReplies = true;
 	private boolean includePromoted = false;
 	@Positive
-	private int maxScrollAttempts = 30;
+	private int maxScrollAttempts = 80;
 	@PositiveOrZero
 	private long scrollDelayMs = 1_200;
 	@Positive
-	private int noNewPostLimit = 3;
+	private int noNewPostLimit = 10;
 	@Positive
 	private long postOpenTimeoutMs = 15_000;
 	private boolean preferLatestTab = true;

@@ -1,6 +1,8 @@
 package org.raul.javawebscarper.scraper.adapter.facebook;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class FacebookScrapeDiagnostics {
@@ -21,6 +23,8 @@ public class FacebookScrapeDiagnostics {
 	int seeMoreExpanded;
 	int seeMoreFailures;
 	int dateParseFailures;
+	private final List<String> unparsedDateSamples = new ArrayList<>();
+	private final List<String> tooNewDateSamples = new ArrayList<>();
 	int tooNewSkipped;
 	int tooOldSkipped;
 	int emptyPostsSkipped;
@@ -32,6 +36,28 @@ public class FacebookScrapeDiagnostics {
 	boolean rateLimitDetected;
 	boolean authenticationExpiredDuringRun;
 	int postsCollected;
+
+	void recordUnparsedDateCandidates(List<String> candidates) {
+		if (unparsedDateSamples.size() >= 5) {
+			return;
+		}
+		candidates.stream()
+				.filter(value -> value != null && !value.isBlank())
+				.map(value -> value.length() > 160 ? value.substring(0, 160) : value)
+				.filter(value -> !unparsedDateSamples.contains(value))
+				.limit(5 - unparsedDateSamples.size())
+				.forEach(unparsedDateSamples::add);
+	}
+
+	void recordTooNewDateSample(String postUrl, java.time.OffsetDateTime postDate, java.time.OffsetDateTime dateTo) {
+		if (tooNewDateSamples.size() >= 5) {
+			return;
+		}
+		String sample = "postUrl=%s, postDate=%s, dateTo=%s".formatted(postUrl, postDate, dateTo);
+		if (!tooNewDateSamples.contains(sample)) {
+			tooNewDateSamples.add(sample);
+		}
+	}
 
 	Map<String, Object> toMetadata() {
 		Map<String, Object> metadata = new LinkedHashMap<>();
@@ -51,6 +77,8 @@ public class FacebookScrapeDiagnostics {
 		metadata.put("seeMoreExpanded", seeMoreExpanded);
 		metadata.put("seeMoreFailures", seeMoreFailures);
 		metadata.put("dateParseFailures", dateParseFailures);
+		metadata.put("unparsedDateSamples", List.copyOf(unparsedDateSamples));
+		metadata.put("tooNewDateSamples", List.copyOf(tooNewDateSamples));
 		metadata.put("tooNewSkipped", tooNewSkipped);
 		metadata.put("tooOldSkipped", tooOldSkipped);
 		metadata.put("emptyPostsSkipped", emptyPostsSkipped);

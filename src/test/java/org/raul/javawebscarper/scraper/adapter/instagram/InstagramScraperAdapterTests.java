@@ -2,6 +2,7 @@ package org.raul.javawebscarper.scraper.adapter.instagram;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.raul.javawebscarper.browser.BrowserPage;
 import org.raul.javawebscarper.model.Keyword;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
@@ -11,11 +12,18 @@ import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionStatus;
 
+import java.lang.reflect.Method;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class InstagramScraperAdapterTests {
 
@@ -59,6 +67,36 @@ class InstagramScraperAdapterTests {
 		assertThat(result.status()).isEqualTo(ScraperExecutionStatus.FAILED);
 		assertThat(result.errorMessage()).contains("INSTAGRAM_AUTH_STATE_MISSING");
 		assertThat(result.errorMessage()).contains("authStateUsed=false");
+	}
+
+	@Test
+	void reloadsAndScrollsSearchPageWhenSearchResultLinkIsNotInitiallyClickable() throws Exception {
+		properties.setMaxScrollAttempts(1);
+		BrowserPage searchPage = mock(BrowserPage.class);
+		String searchUrl = "https://www.instagram.com/explore/search/keyword/?q=porsche";
+		InstagramPostCandidate candidate = new InstagramPostCandidate(
+				"DUgdGwECSMZ",
+				"https://www.instagram.com/p/DUgdGwECSMZ/",
+				InstagramPostType.POST,
+				null
+		);
+		when(searchPage.url()).thenReturn(searchUrl);
+		when(searchPage.clickLinkByHref(anyString())).thenReturn(false, false, true);
+
+		Method method = InstagramScraperAdapter.class.getDeclaredMethod(
+				"openCandidateFromSearchPage",
+				BrowserPage.class,
+				InstagramPostCandidate.class,
+				String.class
+		);
+		method.setAccessible(true);
+		method.invoke(adapter, searchPage, candidate, searchUrl);
+
+		verify(searchPage).navigate(searchUrl);
+		verify(searchPage, never()).navigate(candidate.postUrl(), searchUrl);
+		verify(searchPage).scrollBy(1_100, properties.getScrollDelayMs());
+		verify(searchPage).waitForSelector(InstagramSelectors.BODY, properties.getTimelineLoadTimeoutMs());
+		verify(searchPage, times(2)).waitForTimeout(properties.getActionDelayMs());
 	}
 
 	private ScraperExecutionContext context(Language language) {

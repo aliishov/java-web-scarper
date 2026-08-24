@@ -32,6 +32,13 @@ class FacebookPostUrlParserTests {
 	}
 
 	@Test
+	void parsesModernSharePostUrls() {
+		assertThat(FacebookPostUrlParser.parse("https://www.facebook.com/share/p/1AbCdEfgHi/?mibextid=test").orElseThrow())
+				.extracting(FacebookPostUrl::externalPostId, FacebookPostUrl::canonicalUrl, FacebookPostUrl::type)
+				.containsExactly("1AbCdEfgHi", "https://www.facebook.com/share/p/1AbCdEfgHi", FacebookPostType.POST);
+	}
+
+	@Test
 	void parsesGroupPhotoWatchAndReelUrls() {
 		assertThat(FacebookPostUrlParser.parse("/groups/my-group/posts/555").orElseThrow().canonicalUrl())
 				.isEqualTo("https://www.facebook.com/groups/my-group/posts/555");

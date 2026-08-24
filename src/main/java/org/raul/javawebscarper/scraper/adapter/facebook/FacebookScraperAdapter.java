@@ -111,7 +111,7 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 			}
 			openSearchPage(page, keyword.trim(), searchUrl);
 
-			TimelineCollectionResult result = collectTimeline(page, context, keyword.trim(), diagnostics);
+			TimelineCollectionResult result = collectTimeline(session, page, context, keyword.trim(), diagnostics);
 			log.info(
 					"Finished Facebook scraping: keyword={}, postsCollected={}, containersSeen={}, validCandidates={}, duplicates={}, "
 							+ "sponsoredSkipped={}, reelsSkipped={}, tooNew={}, tooOld={}, empty={}, dateFailures={}, "
@@ -135,7 +135,9 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 			if (!result.posts().isEmpty()) {
 				return ScraperExecutionResult.success(result.posts());
 			}
-			if (result.visibleContainersFound() && result.extractionFailures()) {
+			if (result.visibleContainersFound()
+					&& result.extractionFailures()
+					&& diagnostics.validPostCandidates == 0) {
 				return failed("FACEBOOK_EXTRACTION_FAILED: visible Facebook containers were found but no valid posts were extracted", diagnostics);
 			}
 			return ScraperExecutionResult.empty();
@@ -210,6 +212,7 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 	}
 
 	private TimelineCollectionResult collectTimeline(
+			BrowserSession session,
 			BrowserPage page,
 			ScraperExecutionContext context,
 			String keyword,
@@ -243,6 +246,9 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 					break;
 				}
 				ParseAttempt parsed = parseContainer(container, context, keyword, diagnostics);
+				if (parsed.skipReason() == SkipReason.INVALID_DATE && properties.isOpenPostForDetails()) {
+					parsed = extractFromPostDetails(session, container, context, keyword, diagnostics).orElse(parsed);
+				}
 				if (parsed.skipReason() == SkipReason.SPONSORED) {
 					diagnostics.sponsoredPostsSkipped++;
 					continue;
@@ -263,6 +269,7 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 				}
 				if (DateRangeValidator.isAfterRange(candidate.postDate(), context.dateTo())) {
 					diagnostics.tooNewSkipped++;
+					diagnostics.recordTooNewDateSample(candidate.postUrl(), candidate.postDate(), context.dateTo());
 					continue;
 				}
 				if (DateRangeValidator.isBeforeRange(candidate.postDate(), context.dateFrom())) {
@@ -293,6 +300,16 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 			String keyword,
 			FacebookScrapeDiagnostics diagnostics
 	) {
+		return parseContainer(container, context, keyword, diagnostics, null);
+	}
+
+	private ParseAttempt parseContainer(
+			Element container,
+			ScraperExecutionContext context,
+			String keyword,
+			FacebookScrapeDiagnostics diagnostics,
+			OffsetDateTime detailedPostDate
+	) {
 		if (!properties.isIncludeSponsored() && isSponsored(container)) {
 			return ParseAttempt.skipped(SkipReason.SPONSORED);
 		}
@@ -303,8 +320,9 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 		if (postUrl.get().isReel() && !properties.isIncludeReels()) {
 			return ParseAttempt.skipped(SkipReason.REEL_DISABLED);
 		}
-		Optional<OffsetDateTime> postDate = extractDate(container);
+		Optional<OffsetDateTime> postDate = Optional.ofNullable(detailedPostDate).or(() -> extractDate(container));
 		if (postDate.isEmpty()) {
+			diagnostics.recordUnparsedDateCandidates(dateCandidateValues(container));
 			return ParseAttempt.skipped(SkipReason.INVALID_DATE);
 		}
 		List<ScrapedMediaDTO> media = extractMedia(container, postUrl.get().canonicalUrl(), diagnostics);
@@ -333,6 +351,30 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 				media,
 				metadata
 		));
+	}
+
+	private Optional<ParseAttempt> extractFromPostDetails(
+			BrowserSession session,
+			Element container,
+			ScraperExecutionContext context,
+			String keyword,
+			FacebookScrapeDiagnostics diagnostics
+	) {
+		Optional<FacebookPostUrl> postUrl = postUrl(container);
+		if (postUrl.isEmpty()) {
+			return Optional.empty();
+		}
+		try (BrowserPage detailPage = session.openNewPage()) {
+			detailPage.navigate(postUrl.get().canonicalUrl());
+			detailPage.waitForSelector("body", properties.getTimelineLoadTimeoutMs());
+			detailPage.waitForTimeout(properties.getArticleOpenDelayMs());
+			Document detailDocument = Jsoup.parse(detailPage.content(), postUrl.get().canonicalUrl());
+			return extractDate(detailDocument)
+					.map(date -> parseContainer(container, context, keyword, diagnostics, date));
+		} catch (BrowserEngineException exception) {
+			log.debug("Facebook post detail fallback failed: url={}, error={}", postUrl.get().canonicalUrl(), exception.getMessage());
+			return Optional.empty();
+		}
 	}
 
 	private List<Element> discoverContainers(Document document) {
@@ -383,18 +425,29 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 	}
 
 	private Optional<OffsetDateTime> extractDate(Element container) {
-		return container.select(FacebookSelectors.DATE_CANDIDATE)
-				.stream()
+		return dateCandidateValues(container).stream()
+				.map(dateParser::parse)
+				.flatMap(Optional::stream)
+				.findFirst();
+	}
+
+	private List<String> dateCandidateValues(Element container) {
+		List<Element> elements = new ArrayList<>(container.select(FacebookSelectors.DATE_CANDIDATE));
+		container.select("a[href]").stream()
+				.filter(link -> FacebookPostUrlParser.parse(link.attr("href")).isPresent())
+				.forEach(elements::add);
+		return elements.stream()
 				.flatMap(element -> List.of(
 								element.attr("datetime"),
 								element.attr("data-utime"),
+								element.attr("content"),
 								element.attr("title"),
 								element.attr("aria-label"),
 								element.text())
 						.stream())
-				.map(dateParser::parse)
-				.flatMap(Optional::stream)
-				.findFirst();
+				.filter(value -> value != null && !value.isBlank())
+				.distinct()
+				.toList();
 	}
 
 	private ScrapedAuthorDTO extractAuthor(Element container, FacebookPostUrl postUrl) {

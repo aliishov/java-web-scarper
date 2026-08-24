@@ -56,8 +56,10 @@ security:
 
 scraper:
   auth:
-    bootstrap-enabled: ${SOCIAL_AUTH_BOOTSTRAP_ENABLED:true}
+    # Social sessions are managed from the protected admin UI. Do not open browsers merely on app startup.
+    bootstrap-enabled: ${SOCIAL_AUTH_BOOTSTRAP_ENABLED:false}
     fail-startup-if-auth-fails: ${SOCIAL_AUTH_FAIL_STARTUP:false}
+    interactive-login-timeout-ms: ${SOCIAL_AUTH_INTERACTIVE_LOGIN_TIMEOUT_MS:300000}
     state-dir: ${SOCIAL_AUTH_STATE_DIR:./local/auth}
     x:
       enabled: ${SCRAPER_AUTH_X_ENABLED:true}
@@ -97,8 +99,8 @@ scraper:
       password: ${THREADS_PASSWORD:}
       auth-state-path: ${THREADS_AUTH_STATE_PATH:}
       authentication-required: true
-      login-url: https://www.threads.net/login
-      validation-url: https://www.threads.net/
+      login-url: https://www.threads.com/login
+      validation-url: https://www.threads.com/
   default-time-zone: ${SCRAPER_DEFAULT_TIME_ZONE:Asia/Baku}
   scheduler:
     enabled: ${SCRAPER_SCHEDULER_ENABLED:true}
@@ -114,8 +116,8 @@ scraper:
     max-jobs-per-run: ${SCRAPER_DAILY_MAX_JOBS_PER_RUN:100}
     run-on-startup: ${SCRAPER_DAILY_RUN_ON_STARTUP:false}
   engine:
-    max-pages: ${SCRAPER_ENGINE_MAX_PAGES:5}
-    max-posts: ${SCRAPER_ENGINE_MAX_POSTS:100}
+    max-pages: ${SCRAPER_ENGINE_MAX_PAGES:10}
+    max-posts: ${SCRAPER_ENGINE_MAX_POSTS:300}
     fail-on-unsupported-source: ${SCRAPER_ENGINE_FAIL_ON_UNSUPPORTED_SOURCE:true}
     normalize-urls: ${SCRAPER_ENGINE_NORMALIZE_URLS:true}
     remove-tracking-params: ${SCRAPER_ENGINE_REMOVE_TRACKING_PARAMS:true}
@@ -123,13 +125,14 @@ scraper:
     enabled: ${SCRAPER_BROWSER_ENABLED:true}
     headless: ${SCRAPER_BROWSER_HEADLESS:true}
     browser-type: ${SCRAPER_BROWSER_TYPE:CHROMIUM}
+    executable-path: ${SCRAPER_BROWSER_EXECUTABLE_PATH:}
     launch-timeout-ms: ${SCRAPER_BROWSER_LAUNCH_TIMEOUT_MS:30000}
     navigation-timeout-ms: ${SCRAPER_BROWSER_NAVIGATION_TIMEOUT_MS:30000}
     action-timeout-ms: ${SCRAPER_BROWSER_ACTION_TIMEOUT_MS:10000}
     default-wait-ms: ${SCRAPER_BROWSER_DEFAULT_WAIT_MS:1000}
     viewport-width: ${SCRAPER_BROWSER_VIEWPORT_WIDTH:1366}
     viewport-height: ${SCRAPER_BROWSER_VIEWPORT_HEIGHT:768}
-    user-agent: "${SCRAPER_BROWSER_USER_AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36}"
+    user-agent: "${SCRAPER_BROWSER_USER_AGENT:Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36}"
     slow-mo-ms: ${SCRAPER_BROWSER_SLOW_MO_MS:0}
     max-scroll-attempts: ${SCRAPER_BROWSER_MAX_SCROLL_ATTEMPTS:10}
     scroll-delay-ms: ${SCRAPER_BROWSER_SCROLL_DELAY_MS:1000}
@@ -145,9 +148,9 @@ scraper:
     include-retweets: ${SCRAPER_X_INCLUDE_RETWEETS:true}
     include-replies: ${SCRAPER_X_INCLUDE_REPLIES:true}
     include-promoted: ${SCRAPER_X_INCLUDE_PROMOTED:false}
-    max-scroll-attempts: ${SCRAPER_X_MAX_SCROLL_ATTEMPTS:30}
+    max-scroll-attempts: ${SCRAPER_X_MAX_SCROLL_ATTEMPTS:80}
     scroll-delay-ms: ${SCRAPER_X_SCROLL_DELAY_MS:1200}
-    no-new-post-limit: ${SCRAPER_X_NO_NEW_POST_LIMIT:3}
+    no-new-post-limit: ${SCRAPER_X_NO_NEW_POST_LIMIT:10}
     post-open-timeout-ms: ${SCRAPER_X_POST_OPEN_TIMEOUT_MS:15000}
     prefer-latest-tab: ${SCRAPER_X_PREFER_LATEST_TAB:true}
   facebook:
@@ -162,8 +165,8 @@ scraper:
     locale: ${SCRAPER_FACEBOOK_LOCALE:en-US}
     timezone-id: ${SCRAPER_FACEBOOK_TIMEZONE_ID:Asia/Baku}
     search-mode: ${SCRAPER_FACEBOOK_SEARCH_MODE:RECENT}
-    max-scroll-attempts: ${SCRAPER_FACEBOOK_MAX_SCROLL_ATTEMPTS:30}
-    no-new-post-limit: ${SCRAPER_FACEBOOK_NO_NEW_POST_LIMIT:4}
+    max-scroll-attempts: ${SCRAPER_FACEBOOK_MAX_SCROLL_ATTEMPTS:80}
+    no-new-post-limit: ${SCRAPER_FACEBOOK_NO_NEW_POST_LIMIT:10}
     scroll-delay-ms: ${SCRAPER_FACEBOOK_SCROLL_DELAY_MS:1400}
     include-sponsored: ${SCRAPER_FACEBOOK_INCLUDE_SPONSORED:false}
     include-reels: ${SCRAPER_FACEBOOK_INCLUDE_REELS:false}
@@ -187,9 +190,12 @@ scraper:
     locale: ${SCRAPER_INSTAGRAM_LOCALE:en-US}
     timezone-id: ${SCRAPER_INSTAGRAM_TIMEZONE_ID:Asia/Baku}
     search-mode: ${SCRAPER_INSTAGRAM_SEARCH_MODE:AUTO}
-    max-scroll-attempts: ${SCRAPER_INSTAGRAM_MAX_SCROLL_ATTEMPTS:30}
-    no-new-post-limit: ${SCRAPER_INSTAGRAM_NO_NEW_POST_LIMIT:4}
-    max-candidates: ${SCRAPER_INSTAGRAM_MAX_CANDIDATES:200}
+    max-scroll-attempts: ${SCRAPER_INSTAGRAM_MAX_SCROLL_ATTEMPTS:80}
+    no-new-post-limit: ${SCRAPER_INSTAGRAM_NO_NEW_POST_LIMIT:10}
+    max-candidates: ${SCRAPER_INSTAGRAM_MAX_CANDIDATES:1000}
+    max-posts-per-run: ${SCRAPER_INSTAGRAM_MAX_POSTS_PER_RUN:300}
+    max-post-link-scroll-attempts: ${SCRAPER_INSTAGRAM_MAX_POST_LINK_SCROLL_ATTEMPTS:30}
+    max-run-duration-ms: ${SCRAPER_INSTAGRAM_MAX_RUN_DURATION_MS:3600000}
     max-carousel-items: ${SCRAPER_INSTAGRAM_MAX_CAROUSEL_ITEMS:20}
     scroll-delay-ms: ${SCRAPER_INSTAGRAM_SCROLL_DELAY_MS:1300}
     action-delay-ms: ${SCRAPER_INSTAGRAM_ACTION_DELAY_MS:500}
@@ -216,14 +222,29 @@ scraper:
     readiness-timeout-ms: ${SCRAPER_TIKTOK_READINESS_TIMEOUT_MS:20000}
     search-timeout-ms: ${SCRAPER_TIKTOK_SEARCH_TIMEOUT_MS:20000}
     post-open-timeout-ms: ${SCRAPER_TIKTOK_POST_OPEN_TIMEOUT_MS:20000}
-    max-scroll-attempts: ${SCRAPER_TIKTOK_MAX_SCROLL_ATTEMPTS:30}
-    no-new-post-limit: ${SCRAPER_TIKTOK_NO_NEW_POST_LIMIT:4}
-    max-candidates: ${SCRAPER_TIKTOK_MAX_CANDIDATES:100}
+    max-scroll-attempts: ${SCRAPER_TIKTOK_MAX_SCROLL_ATTEMPTS:80}
+    no-new-post-limit: ${SCRAPER_TIKTOK_NO_NEW_POST_LIMIT:10}
+    max-candidates: ${SCRAPER_TIKTOK_MAX_CANDIDATES:1000}
     action-delay-ms: ${SCRAPER_TIKTOK_ACTION_DELAY_MS:500}
     scroll-delay-ms: ${SCRAPER_TIKTOK_SCROLL_DELAY_MS:1300}
     open-post-for-details: ${SCRAPER_TIKTOK_OPEN_POST_FOR_DETAILS:true}
     include-sponsored: ${SCRAPER_TIKTOK_INCLUDE_SPONSORED:false}
     include-photo-posts: ${SCRAPER_TIKTOK_INCLUDE_PHOTO_POSTS:true}
+  threads:
+    enabled: ${SCRAPER_THREADS_ENABLED:true}
+    base-url: ${SCRAPER_THREADS_BASE_URL:https://www.threads.com}
+    auth-state-path: ${THREADS_AUTH_STATE_PATH:${SOCIAL_AUTH_STATE_DIR:./local/auth}/threads-storage-state.json}
+    authentication-required: ${SCRAPER_THREADS_AUTHENTICATION_REQUIRED:false}
+    locale: ${SCRAPER_THREADS_LOCALE:en-US}
+    timezone-id: ${SCRAPER_THREADS_TIMEZONE_ID:Asia/Baku}
+    max-scroll-attempts: ${SCRAPER_THREADS_MAX_SCROLL_ATTEMPTS:80}
+    no-new-post-limit: ${SCRAPER_THREADS_NO_NEW_POST_LIMIT:10}
+    max-candidates: ${SCRAPER_THREADS_MAX_CANDIDATES:1000}
+    scroll-delay-ms: ${SCRAPER_THREADS_SCROLL_DELAY_MS:1300}
+    action-delay-ms: ${SCRAPER_THREADS_ACTION_DELAY_MS:500}
+    page-load-timeout-ms: ${SCRAPER_THREADS_PAGE_LOAD_TIMEOUT_MS:20000}
+    include-replies: ${SCRAPER_THREADS_INCLUDE_REPLIES:false}
+    include-reposts: ${SCRAPER_THREADS_INCLUDE_REPOSTS:false}
 
 springdoc:
   api-docs:

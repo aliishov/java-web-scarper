@@ -13,10 +13,10 @@ import org.springframework.validation.annotation.Validated;
 public class ScraperEngineProperties {
 
 	@Positive
-	private int maxPages = 5;
+	private int maxPages = 10;
 
 	@Positive
-	private int maxPosts = 100;
+	private int maxPosts = 300;
 
 	private boolean failOnUnsupportedSource = true;
 

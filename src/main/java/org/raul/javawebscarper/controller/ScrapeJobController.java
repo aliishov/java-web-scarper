@@ -80,6 +80,13 @@ public class ScrapeJobController {
 		));
 	}
 
+	@PostMapping("/{id}/run")
+	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> run(@PathVariable UUID id) {
+		ScrapeJobResponseDTO response = scrapeJobOrchestrator.startManualJob(id);
+		return ResponseEntity.status(HttpStatus.ACCEPTED).body(BaseResponseDTO.success(response,
+				"Scrape job started successfully"));
+	}
+
 	@GetMapping("/{id}")
 	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> findById(@PathVariable UUID id) {
 		return ResponseEntity.ok(BaseResponseDTO.success(scrapeJobService.findById(id)));

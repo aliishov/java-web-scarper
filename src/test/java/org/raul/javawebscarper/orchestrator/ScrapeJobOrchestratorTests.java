@@ -92,7 +92,8 @@ class ScrapeJobOrchestratorTests {
 				FIXED_CLOCK,
 				dailyProperties,
 				new PreviousDayDateRangeResolver(),
-				new SourceLanguageSupportService()
+				new SourceLanguageSupportService(),
+				Runnable::run
 		);
 
 		source = Source.builder()

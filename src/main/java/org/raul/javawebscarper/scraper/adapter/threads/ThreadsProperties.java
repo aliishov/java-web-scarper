@@ -25,11 +25,11 @@ public class ThreadsProperties {
 	@Size(max = 64)
 	private String timezoneId = "Asia/Baku";
 	@Positive
-	private int maxScrollAttempts = 30;
+	private int maxScrollAttempts = 80;
 	@Positive
-	private int noNewPostLimit = 4;
+	private int noNewPostLimit = 10;
 	@Positive
-	private int maxCandidates = 200;
+	private int maxCandidates = 1_000;
 	@PositiveOrZero
 	private long scrollDelayMs = 1_300;
 	@PositiveOrZero

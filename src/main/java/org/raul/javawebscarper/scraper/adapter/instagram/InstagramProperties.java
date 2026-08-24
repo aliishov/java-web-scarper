@@ -34,11 +34,17 @@ public class InstagramProperties {
 	private String timezoneId = "Asia/Baku";
 	private InstagramSearchMode searchMode = InstagramSearchMode.AUTO;
 	@Positive
-	private int maxScrollAttempts = 30;
+	private int maxScrollAttempts = 80;
 	@Positive
-	private int noNewPostLimit = 4;
+	private int noNewPostLimit = 10;
 	@Positive
-	private int maxCandidates = 200;
+	private int maxCandidates = 1_000;
+	@Positive
+	private int maxPostsPerRun = 300;
+	@Positive
+	private int maxPostLinkScrollAttempts = 30;
+	@Positive
+	private long maxRunDurationMs = 3_600_000;
 	@Positive
 	private int maxCarouselItems = 20;
 	@PositiveOrZero

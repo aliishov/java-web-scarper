@@ -76,6 +76,15 @@ public final class FacebookPostUrlParser {
 					FacebookPostType.POST
 			);
 		}
+		if (segments.length >= 3 && "share".equalsIgnoreCase(segments[0]) && "p".equalsIgnoreCase(segments[1])) {
+			String shareId = segments[2];
+			return canonical(
+					shareId,
+					"https://" + CANONICAL_HOST + "/share/p/" + shareId,
+					null,
+					FacebookPostType.POST
+			);
+		}
 		if (segments.length >= 2 && "reel".equalsIgnoreCase(segments[0])) {
 			String reelId = segments[1];
 			return canonical(

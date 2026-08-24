@@ -18,6 +18,9 @@ public class BrowserEngineProperties {
 	private boolean enabled = true;
 	private boolean headless = true;
 	private BrowserType browserType = BrowserType.CHROMIUM;
+	/** Optional path to an OS-managed browser binary (recommended on rolling Linux distributions). */
+	@Size(max = 1024)
+	private String executablePath = "";
 	@Positive
 	private long launchTimeoutMs = 30_000;
 	@Positive
@@ -32,8 +35,8 @@ public class BrowserEngineProperties {
 	private int viewportHeight = 768;
 	@NotBlank
 	@Size(max = 512)
-	private String userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-			+ "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+	private String userAgent = "Mozilla/5.0 (X11; Linux x86_64) "
+			+ "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
 	@PositiveOrZero
 	private long slowMoMs = 0;
 	@Positive

@@ -40,8 +40,11 @@ public final class FacebookSelectors {
 	);
 	public static final String PROFILE_NAME = "[data-ad-rendering-role='profile_name']";
 	public static final String POST_LINK = "a[href*='/posts/'], a[href*='/permalink.php'], a[href*='story_fbid='], "
-			+ "a[href*='fbid='], a[href*='/groups/'][href*='/posts/'], a[href*='/watch/'], a[href*='/reel/']";
-	public static final String DATE_CANDIDATE = "time[datetime], [data-utime], abbr[title], a[aria-label][href], a[title][href]";
+			+ "a[href*='fbid='], a[href*='/groups/'][href*='/posts/'], a[href*='/share/p/'], a[href*='/watch/'], a[href*='/reel/']";
+	// Facebook often renders the publication time as the text of the post permalink
+	// (for example "6 h") without a datetime, title, or aria-label attribute.
+	public static final String DATE_CANDIDATE = "time[datetime], [data-utime], abbr[title], meta[property='article:published_time'][content], meta[itemprop='datePublished'][content], a[aria-label][href], a[title][href], "
+			+ POST_LINK;
 	public static final String MEDIA = "img[src], img[data-src], video, video source[src]";
 
 	private FacebookSelectors() {

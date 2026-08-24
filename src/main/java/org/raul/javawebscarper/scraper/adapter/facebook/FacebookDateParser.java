@@ -19,6 +19,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,6 +44,10 @@ public class FacebookDateParser {
 			"\\b(\\d{1,2})\\s+([\\p{L}.]+)(?:[,]?\\s+(\\d{4}))?(?:\\s+(?:at|в)?\\s*(\\d{1,2})[:.](\\d{2})\\s*(am|pm)?)?",
 			Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
 	);
+	private static final Pattern ENGLISH_MONTH_DAY = Pattern.compile(
+			"\\b([a-z]+)\\s+(\\d{1,2})(?:[,]?\\s+(\\d{4}))?(?:\\s+at\\s+(\\d{1,2})[:.](\\d{2})\\s*(am|pm)?)?",
+			Pattern.CASE_INSENSITIVE
+	);
 	private static final Map<String, Integer> MONTHS = Map.ofEntries(
 			Map.entry("january", 1), Map.entry("jan", 1), Map.entry("января", 1), Map.entry("январь", 1), Map.entry("янв", 1), Map.entry("yanvar", 1),
 			Map.entry("february", 2), Map.entry("feb", 2), Map.entry("февраля", 2), Map.entry("февраль", 2), Map.entry("фев", 2), Map.entry("fevral", 2),
@@ -56,6 +61,10 @@ public class FacebookDateParser {
 			Map.entry("october", 10), Map.entry("oct", 10), Map.entry("октября", 10), Map.entry("октябрь", 10), Map.entry("окт", 10), Map.entry("oktyabr", 10),
 			Map.entry("november", 11), Map.entry("nov", 11), Map.entry("ноября", 11), Map.entry("ноябрь", 11), Map.entry("ноя", 11), Map.entry("noyabr", 11),
 			Map.entry("december", 12), Map.entry("dec", 12), Map.entry("декабря", 12), Map.entry("декабрь", 12), Map.entry("дек", 12), Map.entry("dekabr", 12)
+	);
+	private static final Set<String> ENGLISH_MONTH_NAMES = Set.of(
+			"january", "february", "march", "april", "may", "june",
+			"july", "august", "september", "october", "november", "december"
 	);
 
 	private final ZoneId zoneId;
@@ -83,6 +92,7 @@ public class FacebookDateParser {
 				.or(() -> parseIso(normalized))
 				.or(() -> parseNumericDateTime(normalized))
 				.or(() -> parseEnglishAbsolute(normalized))
+				.or(() -> parseEnglishMonthFirst(normalized))
 				.or(() -> parseTodayYesterday(normalized))
 				.or(() -> parseRelative(normalized))
 				.or(() -> parseLocalizedAbsolute(normalized));
@@ -146,6 +156,35 @@ public class FacebookDateParser {
 			} catch (DateTimeParseException ignoredAgain) {
 				return Optional.empty();
 			}
+		}
+	}
+
+	/** Handles Facebook's en-US feed format, for example "August 5 at 8:30 PM". */
+	private Optional<OffsetDateTime> parseEnglishMonthFirst(String value) {
+		Matcher matcher = ENGLISH_MONTH_DAY.matcher(value.toLowerCase(Locale.ROOT));
+		if (!matcher.find()) {
+			return Optional.empty();
+		}
+		String monthName = matcher.group(1);
+		if (!ENGLISH_MONTH_NAMES.contains(monthName)) {
+			return Optional.empty();
+		}
+		Integer month = MONTHS.get(monthName);
+		int day = Integer.parseInt(matcher.group(2));
+		int year = matcher.group(3) == null ? LocalDate.now(clock).getYear() : Integer.parseInt(matcher.group(3));
+		int hour = matcher.group(4) == null ? 0 : Integer.parseInt(matcher.group(4));
+		int minute = matcher.group(5) == null ? 0 : Integer.parseInt(matcher.group(5));
+		if ("pm".equalsIgnoreCase(matcher.group(6)) && hour < 12) {
+			hour += 12;
+		}
+		if ("am".equalsIgnoreCase(matcher.group(6)) && hour == 12) {
+			hour = 0;
+		}
+		try {
+			OffsetDateTime parsed = LocalDate.of(year, month, day).atTime(hour, minute).atZone(zoneId).toOffsetDateTime();
+			return Optional.of(matcher.group(3) == null && parsed.isAfter(OffsetDateTime.now(clock)) ? parsed.minusYears(1) : parsed);
+		} catch (RuntimeException exception) {
+			return Optional.empty();
 		}
 	}
 
