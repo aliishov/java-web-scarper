@@ -65,7 +65,7 @@ class FacebookPropertiesTests {
 		assertThat(properties.getAuthVerificationUrl()).isEqualTo("https://www.facebook.com/");
 		assertThat(properties.getLoginTimeoutMs()).isEqualTo(60_000);
 		assertThat(properties.getManualVerificationTimeoutMs()).isEqualTo(300_000);
-		assertThat(properties.getLocale()).isEqualTo("en-US");
+		assertThat(properties.getLocale()).isEqualTo("az-AZ");
 		assertThat(properties.getTimezoneId()).isEqualTo("Asia/Baku");
 		assertThat(properties.getSearchMode()).isEqualTo(FacebookSearchMode.RECENT);
 		assertThat(properties.isIncludeSponsored()).isFalse();

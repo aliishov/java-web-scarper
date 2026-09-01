@@ -7,6 +7,7 @@ import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 
 public final class ScrapeJobMapper {
 
@@ -19,6 +20,7 @@ public final class ScrapeJobMapper {
 				.keyword(keyword)
 				.dateFrom(request.dateFrom())
 				.dateTo(request.dateTo())
+				.searchRegion(request.searchRegion() == null ? SearchRegion.defaultRegion() : request.searchRegion())
 				.runType(request.runType() == null ? ScrapeJobRunType.MANUAL : request.runType())
 				.status(ScrapeJobStatus.PENDING)
 				.postsFound(0)
@@ -27,6 +29,7 @@ public final class ScrapeJobMapper {
 	}
 
 	public static ScrapeJobResponseDTO toResponse(ScrapeJob scrapeJob) {
+		SearchRegion searchRegion = resolveSearchRegion(scrapeJob);
 		return new ScrapeJobResponseDTO(
 				scrapeJob.getId(),
 				scrapeJob.getSource().getId(),
@@ -35,6 +38,8 @@ public final class ScrapeJobMapper {
 				scrapeJob.getKeyword().getWord(),
 				scrapeJob.getDateFrom(),
 				scrapeJob.getDateTo(),
+				searchRegion,
+				searchRegion.displayName(),
 				scrapeJob.getRunType(),
 				scrapeJob.getStatus(),
 				scrapeJob.getStartedAt(),
@@ -45,5 +50,9 @@ public final class ScrapeJobMapper {
 				scrapeJob.getCreatedAt(),
 				scrapeJob.getUpdatedAt()
 		);
+	}
+
+	private static SearchRegion resolveSearchRegion(ScrapeJob scrapeJob) {
+		return scrapeJob.getSearchRegion() == null ? SearchRegion.defaultRegion() : scrapeJob.getSearchRegion();
 	}
 }

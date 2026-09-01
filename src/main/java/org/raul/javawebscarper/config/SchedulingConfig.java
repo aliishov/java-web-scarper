@@ -4,6 +4,7 @@ import org.raul.javawebscarper.browser.BrowserEngineProperties;
 import org.raul.javawebscarper.auth.SocialAuthProperties;
 import org.raul.javawebscarper.scraper.adapter.facebook.FacebookProperties;
 import org.raul.javawebscarper.scraper.adapter.instagram.InstagramProperties;
+import org.raul.javawebscarper.scraper.adapter.threads.ThreadsProperties;
 import org.raul.javawebscarper.scraper.adapter.tiktok.TikTokProperties;
 import org.raul.javawebscarper.scraper.adapter.xcom.XComProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -21,10 +22,12 @@ import java.util.concurrent.Executor;
 		ScrapeSchedulerProperties.class,
 		DailyScrapingProperties.class,
 		ScraperEngineProperties.class,
+		ScrapeJobExecutionProperties.class,
 		BrowserEngineProperties.class,
 		SocialAuthProperties.class,
 		FacebookProperties.class,
 		InstagramProperties.class,
+		ThreadsProperties.class,
 		TikTokProperties.class,
 		XComProperties.class
 })
@@ -36,11 +39,11 @@ public class SchedulingConfig {
 	}
 
 	@Bean("scrapeJobExecutor")
-	public Executor scrapeJobExecutor() {
+	public Executor scrapeJobExecutor(ScrapeJobExecutionProperties properties) {
 		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-		executor.setCorePoolSize(4);
-		executor.setMaxPoolSize(8);
-		executor.setQueueCapacity(100);
+		executor.setCorePoolSize(properties.getMaxConcurrency());
+		executor.setMaxPoolSize(properties.getMaxConcurrency());
+		executor.setQueueCapacity(properties.getMaxConcurrency() * 25);
 		executor.setThreadNamePrefix("scrape-job-");
 		executor.initialize();
 		return executor;

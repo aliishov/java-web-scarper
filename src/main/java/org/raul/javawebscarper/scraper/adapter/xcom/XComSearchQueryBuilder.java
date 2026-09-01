@@ -1,5 +1,7 @@
 package org.raul.javawebscarper.scraper.adapter.xcom;
 
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
+import org.raul.javawebscarper.scraper.support.SocialSearchRegionContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -27,10 +29,19 @@ public class XComSearchQueryBuilder {
 	}
 
 	public String buildQuery(String keyword, OffsetDateTime dateFrom, OffsetDateTime dateTo) {
+		return buildQuery(keyword, dateFrom, dateTo, SocialSearchRegionContext.DEFAULT_REGION);
+	}
+
+	public String buildQuery(
+			String keyword,
+			OffsetDateTime dateFrom,
+			OffsetDateTime dateTo,
+			SearchRegion searchRegion
+	) {
 		List<String> parts = new ArrayList<>();
-		String trimmedKeyword = keyword == null ? "" : keyword.trim();
-		if (!trimmedKeyword.isBlank()) {
-			parts.add(trimmedKeyword);
+		String searchQuery = SocialSearchRegionContext.apply(keyword, searchRegion);
+		if (!searchQuery.isBlank()) {
+			parts.add(searchQuery);
 		}
 		if (dateFrom != null) {
 			parts.add("since:" + dateFrom.atZoneSameInstant(zoneId).toLocalDate());
@@ -43,8 +54,19 @@ public class XComSearchQueryBuilder {
 	}
 
 	public String buildSearchUrl(String baseUrl, String keyword, OffsetDateTime dateFrom, OffsetDateTime dateTo, XSearchMode mode) {
+		return buildSearchUrl(baseUrl, keyword, dateFrom, dateTo, mode, SocialSearchRegionContext.DEFAULT_REGION);
+	}
+
+	public String buildSearchUrl(
+			String baseUrl,
+			String keyword,
+			OffsetDateTime dateFrom,
+			OffsetDateTime dateTo,
+			XSearchMode mode,
+			SearchRegion searchRegion
+	) {
 		String normalizedBaseUrl = normalizeBaseUrl(baseUrl);
-		String query = buildQuery(keyword, dateFrom, dateTo);
+		String query = buildQuery(keyword, dateFrom, dateTo, searchRegion);
 		XSearchMode safeMode = mode == null ? XSearchMode.LATEST : mode;
 		return normalizedBaseUrl + "/search?f=" + safeMode.queryValue()
 				+ "&q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)

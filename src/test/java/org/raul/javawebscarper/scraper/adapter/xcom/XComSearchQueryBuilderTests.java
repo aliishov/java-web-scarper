@@ -23,6 +23,7 @@ class XComSearchQueryBuilderTests {
 
 		assertThat(url).startsWith("https://x.com/search?f=live&q=");
 		assertThat(url).contains("M%C9%99hk%C9%99m%C9%99");
+		assertThat(url).contains("Az%C9%99rbaycan");
 		assertThat(url).contains("since%3A2026-07-14");
 		assertThat(url).contains("until%3A2026-07-15");
 		assertThat(url).endsWith("&src=typed_query");
@@ -38,13 +39,13 @@ class XComSearchQueryBuilderTests {
 				XSearchMode.TOP
 		);
 
-		assertThat(url).isEqualTo("https://x.com/search?f=top&q=Ilham+Aliyev&src=typed_query");
+		assertThat(url).isEqualTo("https://x.com/search?f=top&q=Ilham+Aliyev+Az%C9%99rbaycan&src=typed_query");
 	}
 
 	@Test
 	void buildQueryOmitsDateOperatorsWhenRangeIsMissing() {
 		String query = builder.buildQuery("court", null, null);
 
-		assertThat(query).isEqualTo("court");
+		assertThat(query).isEqualTo("court Azərbaycan");
 	}
 }

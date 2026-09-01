@@ -12,11 +12,15 @@ import org.raul.javawebscarper.model.PostKeyword;
 import org.raul.javawebscarper.model.PostMedia;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.MediaType;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
+import org.raul.javawebscarper.model.enumerated.SourceType;
 import org.raul.javawebscarper.repository.AuthorRepository;
 import org.raul.javawebscarper.repository.PostKeywordRepository;
 import org.raul.javawebscarper.repository.PostRepository;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
+import org.raul.javawebscarper.scraper.support.KeywordTextMatcher;
+import org.raul.javawebscarper.scraper.support.SocialSearchRegionContext;
 import org.raul.javawebscarper.scraper.support.TextHashGenerator;
 import org.raul.javawebscarper.scraper.support.UrlNormalizer;
 import org.raul.javawebscarper.scraper.support.ScraperClock;
@@ -54,11 +58,20 @@ public class ScrapedPostIngestionService {
 		for (ScrapedPostDTO scrapedPost : result.posts()) {
 			try {
 				NormalizedScrapedPost normalizedPost = normalizePost(context.source(), scrapedPost);
+				Optional<String> matchedText = findKeywordMatch(context.keyword(), normalizedPost);
+				if (matchedText.isEmpty()) {
+					counters.skip("Scraped post does not match keyword after normalization: " + normalizedPost.postUrl());
+					continue;
+				}
+				if (!matchesSearchRegion(context, normalizedPost)) {
+					counters.skip("Scraped social post does not match selected search region: " + normalizedPost.postUrl());
+					continue;
+				}
 				if (!seenPayloadKeys.add(normalizedPost.deduplicationKey())) {
 					counters.skip("Duplicate scraped post in execution result: " + normalizedPost.postUrl());
 					continue;
 				}
-				IngestedPostOutcome outcome = ingestPost(context, normalizedPost);
+				IngestedPostOutcome outcome = ingestPost(context, normalizedPost, matchedText.get());
 				counters.add(outcome);
 			} catch (RuntimeException exception) {
 				String postUrl = scrapedPost == null ? null : scrapedPost.postUrl();
@@ -82,7 +95,11 @@ public class ScrapedPostIngestionService {
 		return ingestionResult;
 	}
 
-	private IngestedPostOutcome ingestPost(ScraperExecutionContext context, NormalizedScrapedPost normalizedPost) {
+	private IngestedPostOutcome ingestPost(
+			ScraperExecutionContext context,
+			NormalizedScrapedPost normalizedPost,
+			String matchedText
+	) {
 		Author author = resolveAuthor(context.source(), normalizedPost.author());
 		OffsetDateTime now = scraperClock.now();
 		Optional<Post> existingPost = findExistingPost(context.source(), normalizedPost);
@@ -99,9 +116,24 @@ public class ScrapedPostIngestionService {
 		}
 
 		int mediaCreated = addNewMedia(post, normalizedPost.media());
-		int keywordsLinked = linkKeyword(post, context.keyword());
+		int keywordsLinked = linkKeyword(post, context.keyword(), matchedText);
 		Post savedPost = postRepository.save(post);
 		return new IngestedPostOutcome(savedPost.getId(), created, mediaCreated, keywordsLinked);
+	}
+
+	private Optional<String> findKeywordMatch(Keyword keyword, NormalizedScrapedPost normalizedPost) {
+		if (keyword == null) {
+			return Optional.empty();
+		}
+		return KeywordTextMatcher.findMatch(normalizedPost.text(), keyword.getWord());
+	}
+
+	private boolean matchesSearchRegion(ScraperExecutionContext context, NormalizedScrapedPost normalizedPost) {
+		if (context.source() == null || context.source().getType() != SourceType.SOCIAL) {
+			return true;
+		}
+		SearchRegion searchRegion = context.searchRegion() == null ? SearchRegion.defaultRegion() : context.searchRegion();
+		return SocialSearchRegionContext.matches(normalizedPost.text(), normalizedPost.language(), searchRegion);
 	}
 
 	private NormalizedScrapedPost normalizePost(Source source, ScrapedPostDTO scrapedPost) {
@@ -281,7 +313,7 @@ public class ScrapedPostIngestionService {
 		return created;
 	}
 
-	private int linkKeyword(Post post, Keyword keyword) {
+	private int linkKeyword(Post post, Keyword keyword, String matchedText) {
 		if (keyword == null) {
 			return 0;
 		}
@@ -294,7 +326,7 @@ public class ScrapedPostIngestionService {
 		post.getKeywords().add(PostKeyword.builder()
 				.post(post)
 				.keyword(keyword)
-				.matchedText(keyword.getWord())
+				.matchedText(matchedText)
 				.build());
 		return 1;
 	}

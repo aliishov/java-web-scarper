@@ -121,6 +121,11 @@ scraper:
     fail-on-unsupported-source: ${SCRAPER_ENGINE_FAIL_ON_UNSUPPORTED_SOURCE:true}
     normalize-urls: ${SCRAPER_ENGINE_NORMALIZE_URLS:true}
     remove-tracking-params: ${SCRAPER_ENGINE_REMOVE_TRACKING_PARAMS:true}
+  execution:
+    enabled: ${SCRAPER_EXECUTION_ENABLED:true}
+    max-concurrency: ${SCRAPER_EXECUTION_MAX_CONCURRENCY:4}
+    per-source-concurrency: ${SCRAPER_EXECUTION_PER_SOURCE_CONCURRENCY:1}
+    job-timeout: ${SCRAPER_EXECUTION_JOB_TIMEOUT:30m}
   browser:
     enabled: ${SCRAPER_BROWSER_ENABLED:true}
     headless: ${SCRAPER_BROWSER_HEADLESS:true}
@@ -162,7 +167,7 @@ scraper:
     auth-verification-url: ${SCRAPER_FACEBOOK_AUTH_VERIFICATION_URL:https://www.facebook.com/}
     login-timeout-ms: ${SCRAPER_FACEBOOK_LOGIN_TIMEOUT_MS:60000}
     manual-verification-timeout-ms: ${SCRAPER_FACEBOOK_MANUAL_VERIFICATION_TIMEOUT_MS:300000}
-    locale: ${SCRAPER_FACEBOOK_LOCALE:en-US}
+    locale: ${SCRAPER_FACEBOOK_LOCALE:az-AZ}
     timezone-id: ${SCRAPER_FACEBOOK_TIMEZONE_ID:Asia/Baku}
     search-mode: ${SCRAPER_FACEBOOK_SEARCH_MODE:RECENT}
     max-scroll-attempts: ${SCRAPER_FACEBOOK_MAX_SCROLL_ATTEMPTS:80}
@@ -187,7 +192,7 @@ scraper:
     auth-verification-url: ${SCRAPER_INSTAGRAM_AUTH_VERIFICATION_URL:https://www.instagram.com/}
     login-timeout-ms: ${SCRAPER_INSTAGRAM_LOGIN_TIMEOUT_MS:60000}
     manual-verification-timeout-ms: ${SCRAPER_INSTAGRAM_MANUAL_VERIFICATION_TIMEOUT_MS:300000}
-    locale: ${SCRAPER_INSTAGRAM_LOCALE:en-US}
+    locale: ${SCRAPER_INSTAGRAM_LOCALE:az-AZ}
     timezone-id: ${SCRAPER_INSTAGRAM_TIMEZONE_ID:Asia/Baku}
     search-mode: ${SCRAPER_INSTAGRAM_SEARCH_MODE:AUTO}
     max-scroll-attempts: ${SCRAPER_INSTAGRAM_MAX_SCROLL_ATTEMPTS:80}
@@ -208,15 +213,15 @@ scraper:
     enabled: ${SCRAPER_TIKTOK_ENABLED:true}
     base-url: ${SCRAPER_TIKTOK_BASE_URL:https://www.tiktok.com}
     auth-state-path: ${TIKTOK_AUTH_STATE_PATH:${SOCIAL_AUTH_STATE_DIR:./local/auth}/tiktok-storage-state.json}
-    authentication-mode: ${SCRAPER_TIKTOK_AUTHENTICATION_MODE:AUTO}
-    authentication-required: ${SCRAPER_TIKTOK_AUTHENTICATION_REQUIRED:false}
+    authentication-mode: ${SCRAPER_TIKTOK_AUTHENTICATION_MODE:AUTHENTICATED}
+    authentication-required: ${SCRAPER_TIKTOK_AUTHENTICATION_REQUIRED:true}
     login-url: ${SCRAPER_TIKTOK_LOGIN_URL:https://www.tiktok.com/login}
     auth-verification-url: ${SCRAPER_TIKTOK_AUTH_VERIFICATION_URL:https://www.tiktok.com/}
     login-timeout-ms: ${SCRAPER_TIKTOK_LOGIN_TIMEOUT_MS:60000}
     manual-verification-timeout-ms: ${SCRAPER_TIKTOK_MANUAL_VERIFICATION_TIMEOUT_MS:300000}
-    locale: ${SCRAPER_TIKTOK_LOCALE:en-US}
+    locale: ${SCRAPER_TIKTOK_LOCALE:az-AZ}
     timezone-id: ${SCRAPER_TIKTOK_TIMEZONE_ID:Asia/Baku}
-    allow-anonymous-fallback: ${SCRAPER_TIKTOK_ALLOW_ANONYMOUS_FALLBACK:true}
+    allow-anonymous-fallback: ${SCRAPER_TIKTOK_ALLOW_ANONYMOUS_FALLBACK:false}
     search-mode: ${SCRAPER_TIKTOK_SEARCH_MODE:AUTO}
     navigation-timeout-ms: ${SCRAPER_TIKTOK_NAVIGATION_TIMEOUT_MS:30000}
     readiness-timeout-ms: ${SCRAPER_TIKTOK_READINESS_TIMEOUT_MS:20000}
@@ -234,8 +239,8 @@ scraper:
     enabled: ${SCRAPER_THREADS_ENABLED:true}
     base-url: ${SCRAPER_THREADS_BASE_URL:https://www.threads.com}
     auth-state-path: ${THREADS_AUTH_STATE_PATH:${SOCIAL_AUTH_STATE_DIR:./local/auth}/threads-storage-state.json}
-    authentication-required: ${SCRAPER_THREADS_AUTHENTICATION_REQUIRED:false}
-    locale: ${SCRAPER_THREADS_LOCALE:en-US}
+    authentication-required: ${SCRAPER_THREADS_AUTHENTICATION_REQUIRED:true}
+    locale: ${SCRAPER_THREADS_LOCALE:az-AZ}
     timezone-id: ${SCRAPER_THREADS_TIMEZONE_ID:Asia/Baku}
     max-scroll-attempts: ${SCRAPER_THREADS_MAX_SCROLL_ATTEMPTS:80}
     no-new-post-limit: ${SCRAPER_THREADS_NO_NEW_POST_LIMIT:10}

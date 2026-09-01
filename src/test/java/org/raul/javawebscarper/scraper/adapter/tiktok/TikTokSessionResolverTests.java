@@ -38,6 +38,9 @@ class TikTokSessionResolverTests {
 	@Test
 	void autoWithoutStateFallsBackToAnonymousAccess() {
 		TikTokProperties properties = properties();
+		properties.setAuthenticationMode(TikTokAuthenticationMode.AUTO);
+		properties.setAuthenticationRequired(false);
+		properties.setAllowAnonymousFallback(true);
 		TestResolver resolver = new TestResolver(properties, TikTokAuthenticationStatus.ANONYMOUS_ACCESS);
 
 		try (TikTokResolvedSession session = resolver.resolve()) {
@@ -52,6 +55,8 @@ class TikTokSessionResolverTests {
 	void autoExpiredStateFallsBackToAnonymousWhenAllowed() throws Exception {
 		TikTokProperties properties = properties();
 		properties.setAuthStatePath(validState().toString());
+		properties.setAuthenticationMode(TikTokAuthenticationMode.AUTO);
+		properties.setAuthenticationRequired(false);
 		properties.setAllowAnonymousFallback(true);
 		TestResolver resolver = new TestResolver(
 				properties,

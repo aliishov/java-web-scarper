@@ -9,6 +9,7 @@ import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.Language;
 import org.raul.javawebscarper.model.enumerated.MediaType;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
+import org.raul.javawebscarper.scraper.support.KeywordTextMatcher;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -105,6 +106,10 @@ public final class ThreadsScraperSupport {
 		List<ScrapedMediaDTO> media = extractMedia(root);
 		if (author == null || postDate == null || (text.isBlank() && media.isEmpty())) {
 			diagnostics.extractionFailures++;
+			return Optional.empty();
+		}
+		if (KeywordTextMatcher.findMatch(text, context.keyword().getWord()).isEmpty()) {
+			diagnostics.keywordMismatchSkipped++;
 			return Optional.empty();
 		}
 		Map<String, Object> metadata = new LinkedHashMap<>();

@@ -19,9 +19,9 @@ public class ThreadsProperties {
 	private String baseUrl = "https://www.threads.com";
 	@Size(max = 1024)
 	private String authStatePath = "";
-	private boolean authenticationRequired = false;
+	private boolean authenticationRequired = true;
 	@Size(max = 32)
-	private String locale = "en-US";
+	private String locale = "az-AZ";
 	@Size(max = 64)
 	private String timezoneId = "Asia/Baku";
 	@Positive

@@ -16,6 +16,7 @@ import org.raul.javawebscarper.dto.scraper.ScrapedPostDTO;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.Language;
 import org.raul.javawebscarper.model.enumerated.MediaType;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
@@ -75,12 +76,13 @@ public class XComScraperAdapter implements ScraperAdapter {
 				keyword.trim(),
 				context.dateFrom(),
 				context.dateTo(),
-				properties.getSearchMode()
+				properties.getSearchMode(),
+				context.searchRegion()
 		);
 		XScrapeDiagnostics diagnostics = new XScrapeDiagnostics();
 		BrowserSessionOptions sessionOptions;
 		try {
-			sessionOptions = sessionOptions(diagnostics);
+			sessionOptions = sessionOptions(context.searchRegion(), diagnostics);
 		} catch (BrowserEngineException exception) {
 			log.warn("X auth state is not usable: {}", exception.getMessage());
 			diagnostics.loginWallDetected++;
@@ -153,17 +155,23 @@ public class XComScraperAdapter implements ScraperAdapter {
 		}
 	}
 
-	private BrowserSessionOptions sessionOptions(XScrapeDiagnostics diagnostics) {
+	private BrowserSessionOptions sessionOptions(SearchRegion searchRegion, XScrapeDiagnostics diagnostics) {
 		String authStatePath = properties.getAuthStatePath();
+		String locale = localeFor(searchRegion);
 		if (authStatePath == null || authStatePath.isBlank()) {
 			if (properties.isAuthenticationRequired()) {
 				throw new BrowserEngineException("X authentication state is missing or expired. Regenerate it with the xAuthState Gradle task.");
 			}
-			return BrowserSessionOptions.defaults();
+			return new BrowserSessionOptions(null, locale, null, null, Map.of());
 		}
 		Path path = Path.of(authStatePath.trim());
 		diagnostics.authStateUsed = true;
-		return BrowserSessionOptions.withStorageState(path);
+		return new BrowserSessionOptions(path, locale, null, null, Map.of());
+	}
+
+	private String localeFor(SearchRegion searchRegion) {
+		SearchRegion safeRegion = searchRegion == null ? SearchRegion.defaultRegion() : searchRegion;
+		return safeRegion == SearchRegion.GLOBAL ? "en-US" : safeRegion.locale();
 	}
 
 	private XAuthenticationStatus verifyAuthenticatedSession(BrowserPage page) {

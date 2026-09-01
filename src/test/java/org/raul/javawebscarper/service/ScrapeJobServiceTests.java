@@ -61,6 +61,7 @@ class ScrapeJobServiceTests {
 				keyword.getId(),
 				LocalDate.of(2026, 7, 8),
 				LocalDate.of(2026, 7, 8),
+				null,
 				null
 		);
 		when(sourceService.getEntity(source.getId())).thenReturn(source);

@@ -7,6 +7,7 @@ import org.raul.javawebscarper.browser.BrowserPage;
 import org.raul.javawebscarper.browser.BrowserSession;
 import org.raul.javawebscarper.browser.BrowserSessionFactory;
 import org.raul.javawebscarper.browser.BrowserSessionOptions;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -23,34 +24,38 @@ public class TikTokSessionResolver {
 	private final TikTokAuthenticationVerifier authenticationVerifier;
 
 	public TikTokResolvedSession resolve() {
+		return resolve(SearchRegion.defaultRegion());
+	}
+
+	public TikTokResolvedSession resolve(SearchRegion searchRegion) {
 		TikTokAuthenticationMode mode = properties.getAuthenticationMode() == null
 				? TikTokAuthenticationMode.AUTO
 				: properties.getAuthenticationMode();
 		return switch (mode) {
-			case AUTHENTICATED -> resolveAuthenticated(false);
-			case ANONYMOUS -> resolveAnonymous(false);
-			case AUTO -> resolveAuto();
+			case AUTHENTICATED -> resolveAuthenticated(searchRegion, false);
+			case ANONYMOUS -> resolveAnonymous(searchRegion, false);
+			case AUTO -> resolveAuto(searchRegion);
 		};
 	}
 
-	private TikTokResolvedSession resolveAuto() {
+	private TikTokResolvedSession resolveAuto(SearchRegion searchRegion) {
 		Optional<Path> configuredStatePath = configuredStatePath();
 		if (configuredStatePath.isPresent()) {
 			try {
-				return resolveAuthenticated(false);
+				return resolveAuthenticated(searchRegion, false);
 			} catch (TikTokAuthenticationException exception) {
 				if (properties.isAuthenticationRequired() || !properties.isAllowAnonymousFallback()) {
 					throw exception;
 				}
 				log.info("TikTok authentication state has expired.");
-				return resolveAnonymous(true);
+				return resolveAnonymous(searchRegion, true);
 			}
 		}
 		log.info("TikTok authentication state is missing.");
-		return resolveAnonymous(false);
+		return resolveAnonymous(searchRegion, false);
 	}
 
-	private TikTokResolvedSession resolveAuthenticated(boolean anonymousFallbackUsed) {
+	private TikTokResolvedSession resolveAuthenticated(SearchRegion searchRegion, boolean anonymousFallbackUsed) {
 		Path statePath = configuredStatePath()
 				.orElseThrow(() -> new TikTokAuthenticationException(
 						TikTokAuthenticationStatus.AUTH_STATE_MISSING,
@@ -71,7 +76,7 @@ public class TikTokSessionResolver {
 		log.info("Creating authenticated TikTok browser session.");
 		BrowserSession session = createSession(new BrowserSessionOptions(
 				validatedPath,
-				properties.getLocale(),
+				localeFor(searchRegion),
 				properties.getTimezoneId(),
 				null,
 				Map.of()
@@ -85,11 +90,11 @@ public class TikTokSessionResolver {
 		throw new TikTokAuthenticationException(normalizeAuthenticatedFailure(status), failureMessage(normalizeAuthenticatedFailure(status)));
 	}
 
-	private TikTokResolvedSession resolveAnonymous(boolean anonymousFallbackUsed) {
+	private TikTokResolvedSession resolveAnonymous(SearchRegion searchRegion, boolean anonymousFallbackUsed) {
 		log.info("Creating anonymous TikTok browser session.");
 		BrowserSession session = createSession(new BrowserSessionOptions(
 				null,
-				properties.getLocale(),
+				localeFor(searchRegion),
 				properties.getTimezoneId(),
 				null,
 				Map.of()
@@ -109,6 +114,11 @@ public class TikTokSessionResolver {
 			return Optional.empty();
 		}
 		return Optional.of(TikTokAuthStatePathValidator.normalize(authStatePath));
+	}
+
+	private String localeFor(SearchRegion searchRegion) {
+		SearchRegion safeRegion = searchRegion == null ? SearchRegion.defaultRegion() : searchRegion;
+		return safeRegion == SearchRegion.GLOBAL ? properties.getLocale() : safeRegion.locale();
 	}
 
 	protected BrowserSession createSession(BrowserSessionOptions options) {

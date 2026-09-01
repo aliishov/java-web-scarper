@@ -11,7 +11,10 @@ import org.raul.javawebscarper.dto.request.scrapejob.CreateScrapeJobRequestDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.SearchRegionResponseDTO;
+import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.raul.javawebscarper.orchestrator.ScrapeJobOrchestrator;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -53,6 +57,8 @@ public class ScrapeJobController {
 			@RequestParam(required = false) Integer sourceId,
 			@RequestParam(required = false) Integer keywordId,
 			@RequestParam(required = false) ScrapeJobStatus status,
+			@RequestParam(required = false) ScrapeJobRunType runType,
+			@RequestParam(required = false) SearchRegion searchRegion,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
 			@RequestParam(defaultValue = "0") int page,
@@ -62,7 +68,12 @@ public class ScrapeJobController {
 	) {
 		Pageable pageable = PageRequestFactory.create(page, size, sortBy, direction);
 		return ResponseEntity.ok(BaseResponseDTO.success(
-				scrapeJobService.findAll(sourceId, keywordId, status, dateFrom, dateTo, pageable)));
+				scrapeJobService.findAll(sourceId, keywordId, status, runType, searchRegion, dateFrom, dateTo, pageable)));
+	}
+
+	@GetMapping("/search-regions")
+	public ResponseEntity<BaseResponseDTO<List<SearchRegionResponseDTO>>> searchRegions() {
+		return ResponseEntity.ok(BaseResponseDTO.success(scrapeJobService.supportedSearchRegions()));
 	}
 
 	@PostMapping("/run-scheduled")
@@ -118,8 +129,9 @@ public class ScrapeJobController {
 
 	@PatchMapping("/{id}/start")
 	public ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> start(@PathVariable UUID id) {
-		ScrapeJobResponseDTO response = scrapeJobService.start(id);
-		return ResponseEntity.ok(BaseResponseDTO.success(response, "Scrape job started successfully"));
+		ScrapeJobResponseDTO response = scrapeJobOrchestrator.startManualJob(id);
+		return ResponseEntity.status(HttpStatus.ACCEPTED).body(BaseResponseDTO.success(response,
+				"Scrape job started successfully"));
 	}
 
 	@PatchMapping("/{id}/complete")

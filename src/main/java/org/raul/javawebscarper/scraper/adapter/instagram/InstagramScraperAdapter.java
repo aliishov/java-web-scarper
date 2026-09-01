@@ -11,6 +11,7 @@ import org.raul.javawebscarper.browser.BrowserSessionFactory;
 import org.raul.javawebscarper.browser.BrowserSessionOptions;
 import org.raul.javawebscarper.dto.scraper.ScrapedPostDTO;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
@@ -64,14 +65,19 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 
 		InstagramScrapeDiagnostics diagnostics = new InstagramScrapeDiagnostics();
 		diagnostics.searchMode = searchQueryBuilder.resolveMode(keyword.trim(), properties.getSearchMode());
-		String searchUrl = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword.trim(), properties.getSearchMode());
+		String searchUrl = searchQueryBuilder.buildSearchUrl(
+				properties.getBaseUrl(),
+				keyword.trim(),
+				properties.getSearchMode(),
+				context.searchRegion()
+		);
 		diagnostics.searchQuery = searchUrl;
 		diagnostics.hashtagFallbackUsed = diagnostics.searchMode == InstagramSearchMode.HASHTAG && !keyword.trim().startsWith("#");
 		long deadlineNanos = System.nanoTime() + properties.getMaxRunDurationMs() * 1_000_000L;
 
 		BrowserSessionOptions sessionOptions;
 		try {
-			sessionOptions = sessionOptions(diagnostics);
+			sessionOptions = sessionOptions(context.searchRegion(), diagnostics);
 		} catch (BrowserEngineException exception) {
 			log.warn("Instagram auth state is not usable: {}", exception.getMessage());
 			diagnostics.authenticationStatus = InstagramAuthenticationStatus.AUTH_STATE_MISSING;
@@ -176,7 +182,12 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 		if (isRunTimedOut(deadlineNanos, diagnostics)) {
 			return List.of();
 		}
-		String hashtagUrl = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword, InstagramSearchMode.HASHTAG);
+		String hashtagUrl = searchQueryBuilder.buildSearchUrl(
+				properties.getBaseUrl(),
+				keyword,
+				InstagramSearchMode.HASHTAG,
+				context.searchRegion()
+		);
 		log.info("Trying Instagram hashtag fallback: keyword={}, url={}", keyword, hashtagUrl);
 		diagnostics.searchMode = InstagramSearchMode.HASHTAG;
 		diagnostics.hashtagFallbackUsed = true;
@@ -188,7 +199,7 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 		return collectCandidates(page, context, diagnostics, deadlineNanos);
 	}
 
-	private BrowserSessionOptions sessionOptions(InstagramScrapeDiagnostics diagnostics) {
+	private BrowserSessionOptions sessionOptions(SearchRegion searchRegion, InstagramScrapeDiagnostics diagnostics) {
 		String authStatePath = properties.getAuthStatePath();
 		if (authStatePath == null || authStatePath.isBlank()) {
 			if (properties.isAuthenticationRequired()) {
@@ -201,7 +212,12 @@ public class InstagramScraperAdapter implements ScraperAdapter {
 			throw new BrowserEngineException("Instagram authentication state file is missing or unreadable");
 		}
 		diagnostics.authStateUsed = true;
-		return new BrowserSessionOptions(path, properties.getLocale(), properties.getTimezoneId(), null, Map.of());
+		return new BrowserSessionOptions(path, localeFor(searchRegion), properties.getTimezoneId(), null, Map.of());
+	}
+
+	private String localeFor(SearchRegion searchRegion) {
+		SearchRegion safeRegion = searchRegion == null ? SearchRegion.defaultRegion() : searchRegion;
+		return safeRegion == SearchRegion.GLOBAL ? properties.getLocale() : safeRegion.locale();
 	}
 
 	private InstagramAuthenticationStatus verifyAuthenticatedSession(BrowserPage page) {

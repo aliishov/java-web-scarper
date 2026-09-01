@@ -60,7 +60,12 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 
 		TikTokScrapeDiagnostics diagnostics = new TikTokScrapeDiagnostics();
 		diagnostics.searchMode = searchQueryBuilder.resolveMode(keyword.trim(), properties.getSearchMode());
-		diagnostics.searchQuery = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword.trim(), properties.getSearchMode());
+		diagnostics.searchQuery = searchQueryBuilder.buildSearchUrl(
+				properties.getBaseUrl(),
+				keyword.trim(),
+				properties.getSearchMode(),
+				context.searchRegion()
+		);
 
 		log.info(
 				"Starting TikTok scraping: keyword={}, dateFrom={}, dateTo={}, mode={}, authMode={}, maxScrollAttempts={}, maxPosts={}",
@@ -73,7 +78,7 @@ public class TikTokScraperAdapter implements ScraperAdapter {
 				context.maxPosts()
 		);
 
-		try (TikTokResolvedSession resolvedSession = sessionResolver.resolve()) {
+		try (TikTokResolvedSession resolvedSession = sessionResolver.resolve(context.searchRegion())) {
 			diagnostics.authStateUsed = resolvedSession.storageStateUsed();
 			diagnostics.anonymousFallbackUsed = resolvedSession.anonymousFallbackUsed();
 			diagnostics.authenticationStatus = resolvedSession.authenticationStatus();

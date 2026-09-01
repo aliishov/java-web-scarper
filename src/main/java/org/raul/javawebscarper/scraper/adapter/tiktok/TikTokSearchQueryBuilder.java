@@ -1,5 +1,7 @@
 package org.raul.javawebscarper.scraper.adapter.tiktok;
 
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
+import org.raul.javawebscarper.scraper.support.SocialSearchRegionContext;
 import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
@@ -9,6 +11,15 @@ import java.nio.charset.StandardCharsets;
 public class TikTokSearchQueryBuilder {
 
 	public String buildSearchUrl(String baseUrl, String keyword, TikTokSearchMode searchMode) {
+		return buildSearchUrl(baseUrl, keyword, searchMode, SocialSearchRegionContext.DEFAULT_REGION);
+	}
+
+	public String buildSearchUrl(
+			String baseUrl,
+			String keyword,
+			TikTokSearchMode searchMode,
+			SearchRegion searchRegion
+	) {
 		TikTokSearchMode mode = resolveMode(keyword, searchMode);
 		String base = normalizeBaseUrl(baseUrl);
 		if (mode == TikTokSearchMode.HASHTAG) {
@@ -17,11 +28,16 @@ public class TikTokSearchQueryBuilder {
 				return base + "/tag/" + encodePathSegment(hashtag);
 			}
 		}
-		return buildKeywordSearchUrl(baseUrl, keyword);
+		return buildKeywordSearchUrl(baseUrl, keyword, searchRegion);
 	}
 
 	public String buildKeywordSearchUrl(String baseUrl, String keyword) {
-		return normalizeBaseUrl(baseUrl) + "/search/video?q=" + encode(keyword);
+		return buildKeywordSearchUrl(baseUrl, keyword, SocialSearchRegionContext.DEFAULT_REGION);
+	}
+
+	public String buildKeywordSearchUrl(String baseUrl, String keyword, SearchRegion searchRegion) {
+		String searchQuery = SocialSearchRegionContext.apply(keyword, searchRegion);
+		return normalizeBaseUrl(baseUrl) + "/search/video?q=" + encode(searchQuery);
 	}
 
 	public TikTokSearchMode resolveMode(String keyword, TikTokSearchMode configuredMode) {

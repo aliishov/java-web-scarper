@@ -15,6 +15,7 @@ import org.raul.javawebscarper.dto.scraper.ScrapedMediaDTO;
 import org.raul.javawebscarper.dto.scraper.ScrapedPostDTO;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.MediaType;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
@@ -74,14 +75,19 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 		DateRangeValidator.validate(context.dateFrom(), context.dateTo());
 
 		FacebookScrapeDiagnostics diagnostics = new FacebookScrapeDiagnostics();
-		String searchUrl = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword.trim(), properties.getSearchMode());
+		String searchUrl = searchQueryBuilder.buildSearchUrl(
+				properties.getBaseUrl(),
+				keyword.trim(),
+				properties.getSearchMode(),
+				context.searchRegion()
+		);
 		diagnostics.searchQuery = searchUrl;
 		diagnostics.postsFilterConfirmed = searchUrl.contains("/search/posts/");
 		diagnostics.recentFilterConfirmed = properties.getSearchMode() == FacebookSearchMode.RECENT && searchUrl.contains("filters=");
 
 		BrowserSessionOptions sessionOptions;
 		try {
-			sessionOptions = sessionOptions(diagnostics);
+			sessionOptions = sessionOptions(context.searchRegion(), diagnostics);
 		} catch (BrowserEngineException exception) {
 			log.warn("Facebook auth state is not usable: {}", exception.getMessage());
 			diagnostics.authenticationStatus = FacebookAuthenticationStatus.AUTH_STATE_MISSING;
@@ -150,7 +156,7 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 		}
 	}
 
-	private BrowserSessionOptions sessionOptions(FacebookScrapeDiagnostics diagnostics) {
+	private BrowserSessionOptions sessionOptions(SearchRegion searchRegion, FacebookScrapeDiagnostics diagnostics) {
 		String authStatePath = properties.getAuthStatePath();
 		if (authStatePath == null || authStatePath.isBlank()) {
 			if (properties.isAuthenticationRequired()) {
@@ -163,7 +169,12 @@ public class FacebookScraperAdapter implements ScraperAdapter {
 			throw new BrowserEngineException("Facebook authentication state file is missing or unreadable");
 		}
 		diagnostics.authStateUsed = true;
-		return new BrowserSessionOptions(path, properties.getLocale(), properties.getTimezoneId(), null, Map.of());
+		return new BrowserSessionOptions(path, localeFor(searchRegion), properties.getTimezoneId(), null, Map.of());
+	}
+
+	private String localeFor(SearchRegion searchRegion) {
+		SearchRegion safeRegion = searchRegion == null ? SearchRegion.defaultRegion() : searchRegion;
+		return safeRegion == SearchRegion.GLOBAL ? properties.getLocale() : safeRegion.locale();
 	}
 
 	private FacebookAuthenticationStatus verifyAuthenticatedSession(BrowserPage page) {

@@ -70,19 +70,20 @@ class TikTokPropertiesTests {
 	}
 
 	@Test
-	void defaultsAllowAnonymousAccessWithoutExternalState() {
+	void defaultsRequireAuthenticatedState() {
 		TikTokProperties properties = new TikTokProperties();
 
 		assertThat(properties.isEnabled()).isTrue();
 		assertThat(properties.getBaseUrl()).isEqualTo("https://www.tiktok.com");
 		assertThat(properties.getAuthStatePath()).isEmpty();
-		assertThat(properties.getAuthenticationMode()).isEqualTo(TikTokAuthenticationMode.AUTO);
-		assertThat(properties.isAuthenticationRequired()).isFalse();
+		assertThat(properties.getAuthenticationMode()).isEqualTo(TikTokAuthenticationMode.AUTHENTICATED);
+		assertThat(properties.isAuthenticationRequired()).isTrue();
 		assertThat(properties.getLoginUrl()).isEqualTo("https://www.tiktok.com/login");
 		assertThat(properties.getAuthVerificationUrl()).isEqualTo("https://www.tiktok.com/");
 		assertThat(properties.getLoginTimeoutMs()).isEqualTo(60_000);
 		assertThat(properties.getManualVerificationTimeoutMs()).isEqualTo(300_000);
-		assertThat(properties.isAllowAnonymousFallback()).isTrue();
+		assertThat(properties.getLocale()).isEqualTo("az-AZ");
+		assertThat(properties.isAllowAnonymousFallback()).isFalse();
 		assertThat(properties.getSearchMode()).isEqualTo(TikTokSearchMode.AUTO);
 		assertThat(properties.isIncludeSponsored()).isFalse();
 		assertThat(properties.isIncludePhotoPosts()).isTrue();

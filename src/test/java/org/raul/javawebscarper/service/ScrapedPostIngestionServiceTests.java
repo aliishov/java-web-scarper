@@ -17,6 +17,8 @@ import org.raul.javawebscarper.model.PostMedia;
 import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.MediaType;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
+import org.raul.javawebscarper.model.enumerated.SourceType;
 import org.raul.javawebscarper.repository.AuthorRepository;
 import org.raul.javawebscarper.repository.PostKeywordRepository;
 import org.raul.javawebscarper.repository.PostRepository;
@@ -163,7 +165,7 @@ class ScrapedPostIngestionServiceTests {
 				"https://baku.ws/post/1",
 				POST_DATE,
 				scrapedAuthor(),
-				"Updated scraped text should not overwrite already good stored text.",
+				"Updated scraped text says Ali Mehkeme should not overwrite already good stored text.",
 				"az",
 				List.of(
 						new ScrapedMediaDTO("https://baku.ws/storage/existing.webp", MediaType.IMAGE, 0),
@@ -193,6 +195,111 @@ class ScrapedPostIngestionServiceTests {
 	}
 
 	@Test
+	void matchesKeywordWhenAzerbaijaniLettersDiffer() {
+		keyword.setWord("Ali Mehkeme");
+		ScrapedPostDTO scrapedPost = new ScrapedPostDTO(
+				"external-1",
+				"https://baku.ws/post/1",
+				POST_DATE,
+				scrapedAuthor(),
+				"Azərbaycan Ali Məhkəmə Plenumu yeni qərar qəbul edib.",
+				"az",
+				List.of(),
+				Map.of()
+		);
+
+		ScrapedPostIngestionResult result = service.ingest(
+				context,
+				ScraperExecutionResult.success(List.of(scrapedPost))
+		);
+
+		assertThat(result.postsCreated()).isEqualTo(1);
+		assertThat(result.postsSkipped()).isZero();
+		ArgumentCaptor<Post> postCaptor = ArgumentCaptor.forClass(Post.class);
+		verify(postRepository).save(postCaptor.capture());
+		assertThat(postCaptor.getValue().getKeywords())
+				.extracting(PostKeyword::getMatchedText)
+				.containsExactly("Ali Mehkeme");
+	}
+
+	@Test
+	void skipsPostWhenTextDoesNotMatchKeyword() {
+		ScrapedPostDTO unrelatedPost = new ScrapedPostDTO(
+				"external-1",
+				"https://threads.com/@krpena/post/1",
+				POST_DATE,
+				new ScrapedAuthorDTO("krpena", "krpena", "Krpena", "https://threads.com/@krpena", null),
+				"Zavrsila sam i uslikala je pre 5 min.",
+				"bs",
+				List.of(new ScrapedMediaDTO("https://threads.com/image.jpg", MediaType.IMAGE, 0)),
+				Map.of()
+		);
+
+		ScrapedPostIngestionResult result = service.ingest(
+				context,
+				ScraperExecutionResult.success(List.of(unrelatedPost))
+		);
+
+		assertThat(result.postsCreated()).isZero();
+		assertThat(result.postsSkipped()).isEqualTo(1);
+		assertThat(result.errors()).hasSize(1);
+		verify(authorRepository, never()).save(any(Author.class));
+		verify(postRepository, never()).save(any(Post.class));
+	}
+
+	@Test
+	void skipsSocialPostWhenSelectedRegionDoesNotMatch() {
+		source.setType(SourceType.SOCIAL);
+		keyword.setWord("Ali Mehkeme");
+		context = context(SearchRegion.AZ);
+		ScrapedPostDTO foreignPost = new ScrapedPostDTO(
+				"external-1",
+				"https://threads.com/@court/post/1",
+				POST_DATE,
+				new ScrapedAuthorDTO("court", "court", "Court", "https://threads.com/@court", null),
+				"Ali Mehkeme haqqında xarici analitik paylaşım.",
+				"tr",
+				List.of(),
+				Map.of()
+		);
+
+		ScrapedPostIngestionResult result = service.ingest(
+				context,
+				ScraperExecutionResult.success(List.of(foreignPost))
+		);
+
+		assertThat(result.postsCreated()).isZero();
+		assertThat(result.postsSkipped()).isEqualTo(1);
+		verify(postRepository, never()).save(any(Post.class));
+	}
+
+	@Test
+	void savesSocialPostWhenSelectedRegionMatchesLanguageHint() {
+		source.setType(SourceType.SOCIAL);
+		keyword.setWord("Ali Mehkeme");
+		context = context(SearchRegion.AZ);
+		ScrapedPostDTO localPost = new ScrapedPostDTO(
+				"external-1",
+				"https://threads.com/@court/post/1",
+				POST_DATE,
+				new ScrapedAuthorDTO("court", "court", "Court", "https://threads.com/@court", null),
+				"Ali Məhkəmə yeni qərar qəbul edib.",
+				"az",
+				List.of(),
+				Map.of()
+		);
+
+		ScrapedPostIngestionResult result = service.ingest(
+				context,
+				ScraperExecutionResult.success(List.of(localPost))
+		);
+
+		assertThat(result.postsCreated()).isEqualTo(1);
+		assertThat(result.postsSkipped()).isZero();
+		verify(postRepository).save(any(Post.class));
+	}
+
+	@Test
 	void skipsDuplicateScrapedPostsInsideSameResult() {
 		ScrapedPostDTO first = scrapedPost("external-1", "https://baku.ws/post/1");
 		ScrapedPostDTO duplicate = scrapedPost("external-1", "https://baku.ws/post/1?utm_source=test");
@@ -209,7 +316,7 @@ class ScrapedPostIngestionServiceTests {
 	}
 
 	@Test
-	void createsMediaOnlyPostWhenUrlProvidesDeduplication() {
+	void skipsMediaOnlyPostBecauseKeywordMatchCannotBeVerified() {
 		ScrapedPostDTO mediaOnlyPost = new ScrapedPostDTO(
 				"status-123",
 				"https://x.com/example/status/123",
@@ -226,16 +333,9 @@ class ScrapedPostIngestionServiceTests {
 				ScraperExecutionResult.success(List.of(mediaOnlyPost))
 		);
 
-		assertThat(result.postsCreated()).isEqualTo(1);
-		assertThat(result.postsSkipped()).isZero();
-
-		ArgumentCaptor<Post> postCaptor = ArgumentCaptor.forClass(Post.class);
-		verify(postRepository).save(postCaptor.capture());
-		Post savedPost = postCaptor.getValue();
-		assertThat(savedPost.getText()).isNull();
-		assertThat(savedPost.getTextHash()).isNull();
-		assertThat(savedPost.getMedia()).hasSize(1);
-		assertThat(savedPost.getPostUrl()).isEqualTo("https://x.com/example/status/123");
+		assertThat(result.postsCreated()).isZero();
+		assertThat(result.postsSkipped()).isEqualTo(1);
+		verify(postRepository, never()).save(any(Post.class));
 	}
 
 	private ScrapedPostDTO scrapedPost(String externalPostId, String postUrl) {
@@ -244,13 +344,27 @@ class ScrapedPostIngestionServiceTests {
 				postUrl,
 				POST_DATE,
 				scrapedAuthor(),
-				"Real scraped article text long enough to be persisted as a normalized post body.",
+				"Real scraped article text says Məhkəmə decision is important enough to be persisted.",
 				"az",
 				List.of(
 						new ScrapedMediaDTO("https://baku.ws/storage/existing.webp", MediaType.IMAGE, 0),
 						new ScrapedMediaDTO("https://baku.ws/storage/video.mp4", MediaType.VIDEO, 1)
 				),
 				Map.of()
+		);
+	}
+
+	private ScraperExecutionContext context(SearchRegion searchRegion) {
+		return new ScraperExecutionContext(
+				context.job(),
+				source,
+				keyword,
+				context.dateFrom(),
+				context.dateTo(),
+				context.maxPages(),
+				context.maxPosts(),
+				searchRegion,
+				context.metadata()
 		);
 	}
 

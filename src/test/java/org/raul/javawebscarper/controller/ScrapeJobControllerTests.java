@@ -6,11 +6,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.raul.javawebscarper.dto.common.BaseResponseDTO;
+import org.raul.javawebscarper.dto.common.PageResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.raul.javawebscarper.orchestrator.ScrapeJobOrchestrator;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.springframework.http.HttpStatus;
@@ -18,9 +20,12 @@ import org.springframework.http.ResponseEntity;
 
 import java.time.OffsetDateTime;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +43,49 @@ class ScrapeJobControllerTests {
 	@BeforeEach
 	void setUp() {
 		controller = new ScrapeJobController(scrapeJobService, scrapeJobOrchestrator);
+	}
+
+	@Test
+	void findAllForwardsRunTypeFilter() {
+		PageResponseDTO<ScrapeJobResponseDTO> page = new PageResponseDTO<>(List.of(), 0, 20, 0, 0, true, true);
+		when(scrapeJobService.findAll(
+				eq(1),
+				eq(2),
+				eq(ScrapeJobStatus.SUCCESS),
+				eq(ScrapeJobRunType.DAILY_PREVIOUS_DAY),
+				eq(SearchRegion.AZ),
+				eq(LocalDate.of(2026, 8, 1)),
+				eq(LocalDate.of(2026, 8, 30)),
+				any()
+		)).thenReturn(page);
+
+		ResponseEntity<BaseResponseDTO<PageResponseDTO<ScrapeJobResponseDTO>>> response = controller.findAll(
+				1,
+				2,
+				ScrapeJobStatus.SUCCESS,
+				ScrapeJobRunType.DAILY_PREVIOUS_DAY,
+				SearchRegion.AZ,
+				LocalDate.of(2026, 8, 1),
+				LocalDate.of(2026, 8, 30),
+				0,
+				20,
+				"createdAt",
+				"DESC"
+		);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).isNotNull();
+		assertThat(response.getBody().getData()).isSameAs(page);
+		verify(scrapeJobService).findAll(
+				eq(1),
+				eq(2),
+				eq(ScrapeJobStatus.SUCCESS),
+				eq(ScrapeJobRunType.DAILY_PREVIOUS_DAY),
+				eq(SearchRegion.AZ),
+				eq(LocalDate.of(2026, 8, 1)),
+				eq(LocalDate.of(2026, 8, 30)),
+				any()
+		);
 	}
 
 	@Test
@@ -99,6 +147,7 @@ class ScrapeJobControllerTests {
 		UUID jobId = UUID.randomUUID();
 		ScrapeJobResponseDTO completed = new ScrapeJobResponseDTO(
 				jobId, 1, "INSTAGRAM", 1, "baku", LocalDate.of(2026, 8, 4), LocalDate.of(2026, 8, 4),
+				SearchRegion.AZ, "Azerbaijan",
 				ScrapeJobRunType.MANUAL, ScrapeJobStatus.SUCCESS, OffsetDateTime.now(), OffsetDateTime.now(),
 				2, 2, null, OffsetDateTime.now(), OffsetDateTime.now());
 		when(scrapeJobOrchestrator.startManualJob(jobId)).thenReturn(completed);
@@ -108,6 +157,24 @@ class ScrapeJobControllerTests {
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
 		assertThat(response.getBody()).isNotNull();
 		assertThat(response.getBody().getData()).isEqualTo(completed);
+		verify(scrapeJobOrchestrator).startManualJob(jobId);
+	}
+
+	@Test
+	void startUsesRealBackgroundExecutionFlow() {
+		UUID jobId = UUID.randomUUID();
+		ScrapeJobResponseDTO running = new ScrapeJobResponseDTO(
+				jobId, 1, "INSTAGRAM", 1, "baku", LocalDate.of(2026, 8, 4), LocalDate.of(2026, 8, 4),
+				SearchRegion.AZ, "Azerbaijan",
+				ScrapeJobRunType.MANUAL, ScrapeJobStatus.RUNNING, OffsetDateTime.now(), null,
+				0, 0, null, OffsetDateTime.now(), OffsetDateTime.now());
+		when(scrapeJobOrchestrator.startManualJob(jobId)).thenReturn(running);
+
+		ResponseEntity<BaseResponseDTO<ScrapeJobResponseDTO>> response = controller.start(jobId);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+		assertThat(response.getBody()).isNotNull();
+		assertThat(response.getBody().getData()).isEqualTo(running);
 		verify(scrapeJobOrchestrator).startManualJob(jobId);
 	}
 }

@@ -2,6 +2,7 @@ package org.raul.javawebscarper.dto.request.scrapejob;
 
 import jakarta.validation.constraints.NotNull;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 
 import java.time.LocalDate;
 
@@ -18,6 +19,8 @@ public record CreateScrapeJobRequestDTO(
 		@NotNull
 		LocalDate dateTo,
 
-		ScrapeJobRunType runType
+		ScrapeJobRunType runType,
+
+		SearchRegion searchRegion
 ) {
 }

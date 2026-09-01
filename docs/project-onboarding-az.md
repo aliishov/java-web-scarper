@@ -653,11 +653,25 @@ Qadağandır:
 
 ## Lokal işə salma
 
+`.env` faylı lazımdırsa nümunədən yarat:
+
+```powershell
+copy .env.example .env
+```
+
 PostgreSQL üçün:
 
 ```powershell
 docker compose up -d postgres
 ```
+
+PostgreSQL hazır olduğunu yoxlamaq üçün:
+
+```powershell
+docker compose ps
+```
+
+IDE və ya Gradle ilə run edəndə app default olaraq `localhost:5432`-yə qoşulur. Ona görə əvvəl `postgres` servisi yuxarıdakı komanda ilə qalxmalıdır.
 
 Testlər üçün:
 
@@ -676,6 +690,14 @@ App run üçün:
 ```powershell
 .\gradlew.bat bootRun
 ```
+
+App-i Docker Compose ilə run edəndə:
+
+```powershell
+docker compose up -d app
+```
+
+Bu rejimdə app database-ə `DB_HOST=postgres` ilə qoşulur, çünki app və PostgreSQL eyni Docker network-dədir.
 
 Playwright Chromium install üçün:
 

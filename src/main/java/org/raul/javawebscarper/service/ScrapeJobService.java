@@ -6,6 +6,7 @@ import org.raul.javawebscarper.dto.request.scrapejob.CompleteScrapeJobRequestDTO
 import org.raul.javawebscarper.dto.request.scrapejob.FailScrapeJobRequestDTO;
 import org.raul.javawebscarper.dto.request.scrapejob.CreateScrapeJobRequestDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScrapeJobResponseDTO;
+import org.raul.javawebscarper.dto.response.scrapejob.SearchRegionResponseDTO;
 import org.raul.javawebscarper.exception.BadRequestException;
 import org.raul.javawebscarper.exception.ResourceNotFoundException;
 import org.raul.javawebscarper.mapper.ScrapeJobMapper;
@@ -14,6 +15,7 @@ import org.raul.javawebscarper.model.ScrapeJob;
 import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.raul.javawebscarper.repository.ScrapeJobRepository;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -63,12 +66,25 @@ public class ScrapeJobService {
 			LocalDate dateTo,
 			ScrapeJobRunType runType
 	) {
+		return createPendingJob(source, keyword, dateFrom, dateTo, runType, SearchRegion.defaultRegion());
+	}
+
+	@Transactional
+	public ScrapeJob createPendingJob(
+			Source source,
+			Keyword keyword,
+			LocalDate dateFrom,
+			LocalDate dateTo,
+			ScrapeJobRunType runType,
+			SearchRegion searchRegion
+	) {
 		validateDateRange(dateFrom, dateTo);
 		ScrapeJob scrapeJob = ScrapeJob.builder()
 				.source(source)
 				.keyword(keyword)
 				.dateFrom(dateFrom)
 				.dateTo(dateTo)
+				.searchRegion(searchRegion == null ? SearchRegion.defaultRegion() : searchRegion)
 				.runType(runType == null ? ScrapeJobRunType.SCHEDULED : runType)
 				.status(ScrapeJobStatus.PENDING)
 				.postsFound(0)
@@ -82,13 +98,29 @@ public class ScrapeJobService {
 			Integer sourceId,
 			Integer keywordId,
 			ScrapeJobStatus status,
+			ScrapeJobRunType runType,
+			SearchRegion searchRegion,
 			LocalDate dateFrom,
 			LocalDate dateTo,
 			Pageable pageable
 	) {
 		validateDateRange(dateFrom, dateTo);
-		Specification<ScrapeJob> specification = buildSpecification(sourceId, keywordId, status, dateFrom, dateTo);
+		Specification<ScrapeJob> specification = buildSpecification(
+				sourceId,
+				keywordId,
+				status,
+				runType,
+				searchRegion,
+				dateFrom,
+				dateTo
+		);
 		return PageResponseDTO.from(scrapeJobRepository.findAll(specification, pageable), ScrapeJobMapper::toResponse);
+	}
+
+	public List<SearchRegionResponseDTO> supportedSearchRegions() {
+		return Arrays.stream(SearchRegion.values())
+				.map(SearchRegionResponseDTO::from)
+				.toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -109,11 +141,30 @@ public class ScrapeJobService {
 
 	@Transactional(readOnly = true)
 	public boolean hasActiveJob(Source source, Keyword keyword, LocalDate dateFrom, LocalDate dateTo) {
-		return scrapeJobRepository.existsBySourceAndKeywordAndDateFromAndDateToAndStatusIn(
+		return scrapeJobRepository.existsBySourceAndKeywordAndDateFromAndDateToAndSearchRegionAndStatusIn(
 				source,
 				keyword,
 				dateFrom,
 				dateTo,
+				SearchRegion.defaultRegion(),
+				ACTIVE_JOB_STATUSES
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public boolean hasActiveJob(
+			Source source,
+			Keyword keyword,
+			LocalDate dateFrom,
+			LocalDate dateTo,
+			SearchRegion searchRegion
+	) {
+		return scrapeJobRepository.existsBySourceAndKeywordAndDateFromAndDateToAndSearchRegionAndStatusIn(
+				source,
+				keyword,
+				dateFrom,
+				dateTo,
+				searchRegion == null ? SearchRegion.defaultRegion() : searchRegion,
 				ACTIVE_JOB_STATUSES
 		);
 	}
@@ -126,11 +177,31 @@ public class ScrapeJobService {
 			LocalDate dateTo,
 			ScrapeJobRunType runType
 	) {
-		return scrapeJobRepository.existsBySourceAndKeywordAndDateFromAndDateToAndRunType(
+		return scrapeJobRepository.existsBySourceAndKeywordAndDateFromAndDateToAndSearchRegionAndRunType(
 				source,
 				keyword,
 				dateFrom,
 				dateTo,
+				SearchRegion.defaultRegion(),
+				runType
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public boolean hasJobForRunType(
+			Source source,
+			Keyword keyword,
+			LocalDate dateFrom,
+			LocalDate dateTo,
+			ScrapeJobRunType runType,
+			SearchRegion searchRegion
+	) {
+		return scrapeJobRepository.existsBySourceAndKeywordAndDateFromAndDateToAndSearchRegionAndRunType(
+				source,
+				keyword,
+				dateFrom,
+				dateTo,
+				searchRegion == null ? SearchRegion.defaultRegion() : searchRegion,
 				runType
 		);
 	}
@@ -220,6 +291,8 @@ public class ScrapeJobService {
 			Integer sourceId,
 			Integer keywordId,
 			ScrapeJobStatus status,
+			ScrapeJobRunType runType,
+			SearchRegion searchRegion,
 			LocalDate dateFrom,
 			LocalDate dateTo
 	) {
@@ -236,6 +309,14 @@ public class ScrapeJobService {
 		if (status != null) {
 			specification = specification.and((root, query, criteriaBuilder) ->
 					criteriaBuilder.equal(root.get("status"), status));
+		}
+		if (runType != null) {
+			specification = specification.and((root, query, criteriaBuilder) ->
+					criteriaBuilder.equal(root.get("runType"), runType));
+		}
+		if (searchRegion != null) {
+			specification = specification.and((root, query, criteriaBuilder) ->
+					criteriaBuilder.equal(root.get("searchRegion"), searchRegion));
 		}
 		if (dateFrom != null) {
 			specification = specification.and((root, query, criteriaBuilder) ->

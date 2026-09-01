@@ -23,6 +23,7 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -39,7 +40,7 @@ import java.util.UUID;
 				@Index(name = "idx_scrape_jobs_started_at", columnList = "started_at"),
 				@Index(
 						name = "idx_scrape_jobs_source_keyword_dates_run_type",
-						columnList = "source_id,keyword_id,date_from,date_to,run_type"
+						columnList = "source_id,keyword_id,date_from,date_to,search_region,run_type"
 				)
 		}
 )
@@ -70,6 +71,11 @@ public class ScrapeJob extends BaseEntity {
 
 	@Column(name = "date_to", nullable = false)
 	LocalDate dateTo;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "search_region", nullable = false, length = 16)
+	@Builder.Default
+	SearchRegion searchRegion = SearchRegion.defaultRegion();
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "run_type", nullable = false, length = 50)

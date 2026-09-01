@@ -15,6 +15,7 @@ final class ThreadsScrapeDiagnostics {
 	int postsCollected;
 	int repliesSkipped;
 	int repostsSkipped;
+	int keywordMismatchSkipped;
 	int tooNewSkipped;
 	int tooOldSkipped;
 	int dateParseFailures;
@@ -35,6 +36,7 @@ final class ThreadsScrapeDiagnostics {
 		values.put("postsCollected", postsCollected);
 		values.put("repliesSkipped", repliesSkipped);
 		values.put("repostsSkipped", repostsSkipped);
+		values.put("keywordMismatchSkipped", keywordMismatchSkipped);
 		values.put("tooNewSkipped", tooNewSkipped);
 		values.put("tooOldSkipped", tooOldSkipped);
 		values.put("dateParseFailures", dateParseFailures);

@@ -11,6 +11,7 @@ import org.raul.javawebscarper.browser.BrowserSessionFactory;
 import org.raul.javawebscarper.browser.BrowserSessionOptions;
 import org.raul.javawebscarper.dto.scraper.ScrapedPostDTO;
 import org.raul.javawebscarper.model.Source;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.raul.javawebscarper.scraper.adapter.ScraperAdapter;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionResult;
@@ -60,12 +61,12 @@ public class ThreadsScraperAdapter implements ScraperAdapter {
 		ThreadsScrapeDiagnostics diagnostics = new ThreadsScrapeDiagnostics();
 		BrowserSessionOptions sessionOptions;
 		try {
-			sessionOptions = sessionOptions(diagnostics);
+			sessionOptions = sessionOptions(context.searchRegion(), diagnostics);
 		} catch (BrowserEngineException exception) {
 			return failed("THREADS_AUTH_STATE_MISSING: " + exception.getMessage(), diagnostics);
 		}
 
-		String searchUrl = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword);
+		String searchUrl = searchQueryBuilder.buildSearchUrl(properties.getBaseUrl(), keyword, context.searchRegion());
 		log.info(
 				"Starting Threads scraping: keyword={}, dateFrom={}, dateTo={}, authStateUsed={}, maxScrollAttempts={}, maxPosts={}",
 				keyword,
@@ -111,15 +112,16 @@ public class ThreadsScraperAdapter implements ScraperAdapter {
 		}
 	}
 
-	private BrowserSessionOptions sessionOptions(ThreadsScrapeDiagnostics diagnostics) {
+	private BrowserSessionOptions sessionOptions(SearchRegion searchRegion, ThreadsScrapeDiagnostics diagnostics) {
 		String configuredPath = properties.getAuthStatePath();
+		String locale = localeFor(searchRegion);
 		if (configuredPath == null || configuredPath.isBlank()) {
 			if (properties.isAuthenticationRequired()) {
 				throw new BrowserEngineException("Threads authentication state is not configured");
 			}
 			return new BrowserSessionOptions(
 					null,
-					properties.getLocale(),
+					locale,
 					properties.getTimezoneId(),
 					null,
 					Map.of()
@@ -134,7 +136,12 @@ public class ThreadsScraperAdapter implements ScraperAdapter {
 			return BrowserSessionOptions.defaults();
 		}
 		diagnostics.authStateUsed = true;
-		return new BrowserSessionOptions(path, properties.getLocale(), properties.getTimezoneId(), null, Map.of());
+		return new BrowserSessionOptions(path, locale, properties.getTimezoneId(), null, Map.of());
+	}
+
+	private String localeFor(SearchRegion searchRegion) {
+		SearchRegion safeRegion = searchRegion == null ? SearchRegion.defaultRegion() : searchRegion;
+		return safeRegion == SearchRegion.GLOBAL ? properties.getLocale() : safeRegion.locale();
 	}
 
 	private List<ThreadsPostCandidate> collectCandidates(

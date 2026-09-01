@@ -3,6 +3,7 @@ package org.raul.javawebscarper.orchestrator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.raul.javawebscarper.config.DailyScrapingProperties;
+import org.raul.javawebscarper.config.ScrapeJobExecutionProperties;
 import org.raul.javawebscarper.config.ScrapeSchedulerProperties;
 import org.raul.javawebscarper.dto.response.scrapejob.DailyScrapeRunResponseDTO;
 import org.raul.javawebscarper.dto.response.scrapejob.ScheduledScrapeRunResponseDTO;
@@ -13,24 +14,28 @@ import org.raul.javawebscarper.model.Source;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.scheduler.PreviousDayDateRangeResolver;
 import org.raul.javawebscarper.scheduler.ScrapeDateRange;
-import org.raul.javawebscarper.scraper.ScraperResult;
-import org.raul.javawebscarper.scraper.ScraperRunner;
 import org.raul.javawebscarper.service.KeywordService;
+import org.raul.javawebscarper.service.ScrapeJobExecutionOutcome;
+import org.raul.javawebscarper.service.ScrapeJobExecutionService;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.raul.javawebscarper.service.SourceLanguageSupportService;
 import org.raul.javawebscarper.service.SourceService;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
@@ -40,12 +45,13 @@ public class ScrapeJobOrchestrator {
 	private final SourceService sourceService;
 	private final KeywordService keywordService;
 	private final ScrapeJobService scrapeJobService;
-	private final ScraperRunner scraperRunner;
+	private final ScrapeJobExecutionService scrapeJobExecutionService;
 	private final ScrapeSchedulerProperties schedulerProperties;
 	private final Clock schedulerClock;
 	private final DailyScrapingProperties dailyProperties;
 	private final PreviousDayDateRangeResolver previousDayDateRangeResolver;
 	private final SourceLanguageSupportService sourceLanguageSupportService;
+	private final ScrapeJobExecutionProperties executionProperties;
 	@Qualifier("scrapeJobExecutor")
 	private final Executor scrapeJobExecutor;
 
@@ -82,21 +88,21 @@ public class ScrapeJobOrchestrator {
 		log.info(
 				"Scheduled scrape run finished: jobsCreated={}, jobsSucceeded={}, jobsFailed={}, jobsSkipped={}, "
 						+ "postsFound={}, postsSaved={}",
-				counters.jobsCreated,
-				counters.jobsSucceeded,
-				counters.jobsFailed,
-				counters.jobsSkipped,
-				counters.postsFound,
-				counters.postsSaved
+				counters.jobsCreated.get(),
+				counters.jobsSucceeded.get(),
+				counters.jobsFailed.get(),
+				counters.jobsSkipped.get(),
+				counters.postsFound.get(),
+				counters.postsSaved.get()
 		);
 
 		return new ScheduledScrapeRunResponseDTO(
 				sources.size(),
 				keywords.size(),
-				counters.jobsCreated,
-				counters.jobsSucceeded,
-				counters.jobsFailed,
-				counters.jobsSkipped,
+				counters.jobsCreated.get(),
+				counters.jobsSucceeded.get(),
+				counters.jobsFailed.get(),
+				counters.jobsSkipped.get(),
 				startedAt,
 				finishedAt
 		);
@@ -136,12 +142,12 @@ public class ScrapeJobOrchestrator {
 		log.info(
 				"Daily previous-day scrape run finished: jobsCreated={}, jobsSucceeded={}, jobsFailed={}, "
 						+ "jobsSkipped={}, postsFound={}, postsSaved={}",
-				counters.jobsCreated,
-				counters.jobsSucceeded,
-				counters.jobsFailed,
-				counters.jobsSkipped,
-				counters.postsFound,
-				counters.postsSaved
+				counters.jobsCreated.get(),
+				counters.jobsSucceeded.get(),
+				counters.jobsFailed.get(),
+				counters.jobsSkipped.get(),
+				counters.postsFound.get(),
+				counters.postsSaved.get()
 		);
 
 		return new DailyScrapeRunResponseDTO(
@@ -150,12 +156,12 @@ public class ScrapeJobOrchestrator {
 				zoneId.toString(),
 				sources.size(),
 				keywords.size(),
-				counters.jobsCreated,
-				counters.jobsSucceeded,
-				counters.jobsFailed,
-				counters.jobsSkipped,
-				counters.postsFound,
-				counters.postsSaved,
+				counters.jobsCreated.get(),
+				counters.jobsSucceeded.get(),
+				counters.jobsFailed.get(),
+				counters.jobsSkipped.get(),
+				counters.postsFound.get(),
+				counters.postsSaved.get(),
 				startedAt,
 				finishedAt
 		);
@@ -163,37 +169,15 @@ public class ScrapeJobOrchestrator {
 
 	/** Runs one manually created job and always persists a terminal status. */
 	public ScrapeJobResponseDTO runManualJob(UUID jobId) {
-		ScrapeJob runningJob = scrapeJobService.markRunning(jobId);
-		try {
-			ScraperResult result = scraperRunner.run(runningJob);
-			scrapeJobService.markSuccess(jobId, result.postsFound(), result.postsSaved());
-		} catch (Exception exception) {
-			log.error("Manual scrape job failed: jobId={}", jobId, exception);
-			scrapeJobService.markFailed(jobId, exception.getMessage());
-		}
+		ScrapeJob job = scrapeJobService.getEntityWithSourceAndKeyword(jobId);
+		scrapeJobExecutionService.runPendingJob(job);
 		return scrapeJobService.findById(jobId);
 	}
 
 	/** Starts a manual job without holding the administrator's HTTP request open. */
 	public ScrapeJobResponseDTO startManualJob(UUID jobId) {
-		scrapeJobService.markRunning(jobId);
-		CompletableFuture.runAsync(() -> runManualJobInBackground(jobId), scrapeJobExecutor);
+		scrapeJobExecutionService.startManualJob(jobId);
 		return scrapeJobService.findById(jobId);
-	}
-
-	private void runManualJobInBackground(UUID jobId) {
-		try {
-			ScrapeJob job = scrapeJobService.getEntityWithSourceAndKeyword(jobId);
-			ScraperResult result = scraperRunner.run(job);
-			scrapeJobService.markSuccess(jobId, result.postsFound(), result.postsSaved());
-		} catch (Exception exception) {
-			log.error("Manual scrape job failed: jobId={}", jobId, exception);
-			try {
-				scrapeJobService.markFailed(jobId, exception.getMessage());
-			} catch (Exception statusException) {
-				log.error("Could not mark manual scrape job as FAILED: jobId={}", jobId, statusException);
-			}
-		}
 	}
 
 	private RunCounters createAndRunJobs(
@@ -206,21 +190,32 @@ public class ScrapeJobOrchestrator {
 			boolean skipExistingRunType
 	) {
 		RunCounters counters = new RunCounters();
+		List<ScrapeJobExecutionPlan> executionPlans = new ArrayList<>();
 		boolean maxJobsReached = false;
 
 		for (Source source : sources) {
 			for (Keyword keyword : keywords) {
-				if (counters.jobsCreated >= maxJobsPerRun) {
+				if (counters.jobsCreated.get() >= maxJobsPerRun) {
 					maxJobsReached = true;
 					break;
 				}
-				processSourceKeywordPair(source, keyword, dateFrom, dateTo, runType, skipExistingRunType, counters);
+				processSourceKeywordPair(
+						source,
+						keyword,
+						dateFrom,
+						dateTo,
+						runType,
+						skipExistingRunType,
+						counters,
+						executionPlans
+				);
 			}
 			if (maxJobsReached) {
 				log.info("Max jobs per run reached: maxJobsPerRun={}", maxJobsPerRun);
 				break;
 			}
 		}
+		runCreatedJobs(executionPlans, counters);
 		return counters;
 	}
 
@@ -231,10 +226,11 @@ public class ScrapeJobOrchestrator {
 			LocalDate dateTo,
 			ScrapeJobRunType runType,
 			boolean skipExistingRunType,
-			RunCounters counters
+			RunCounters counters,
+			List<ScrapeJobExecutionPlan> executionPlans
 	) {
 		if (!sourceLanguageSupportService.isSupported(source, keyword)) {
-			counters.jobsSkipped++;
+			counters.jobsSkipped.incrementAndGet();
 			log.info(
 					"Skipping scrape job due to unsupported language: source={}, sourceLanguages={}, keyword={}, "
 							+ "keywordLanguage={}, dateFrom={}, dateTo={}, runType={}",
@@ -250,7 +246,7 @@ public class ScrapeJobOrchestrator {
 		}
 
 		if (skipExistingRunType && scrapeJobService.hasJobForRunType(source, keyword, dateFrom, dateTo, runType)) {
-			counters.jobsSkipped++;
+			counters.jobsSkipped.incrementAndGet();
 			log.info(
 					"Skipping duplicate scrape job for run type: source={}, keyword={}, dateFrom={}, dateTo={}, "
 							+ "runType={}",
@@ -264,7 +260,7 @@ public class ScrapeJobOrchestrator {
 		}
 
 		if (scrapeJobService.hasActiveJob(source, keyword, dateFrom, dateTo)) {
-			counters.jobsSkipped++;
+			counters.jobsSkipped.incrementAndGet();
 			log.debug(
 					"Skipping duplicate active scrape job: source={}, keyword={}, dateFrom={}, dateTo={}, runType={}",
 					source.getCode(),
@@ -279,9 +275,9 @@ public class ScrapeJobOrchestrator {
 		ScrapeJob job;
 		try {
 			job = scrapeJobService.createPendingJob(source, keyword, dateFrom, dateTo, runType);
-			counters.jobsCreated++;
+			counters.jobsCreated.incrementAndGet();
 		} catch (DataIntegrityViolationException exception) {
-			counters.jobsSkipped++;
+			counters.jobsSkipped.incrementAndGet();
 			log.info(
 					"Skipping scrape job after duplicate creation conflict: source={}, keyword={}, dateFrom={}, "
 							+ "dateTo={}, runType={}",
@@ -294,7 +290,7 @@ public class ScrapeJobOrchestrator {
 			log.debug("Duplicate scrape job creation conflict details", exception);
 			return;
 		} catch (Exception exception) {
-			counters.jobsSkipped++;
+			counters.jobsSkipped.incrementAndGet();
 			log.error(
 					"Failed to create scheduled scrape job: source={}, keyword={}, dateFrom={}, dateTo={}, runType={}",
 					source.getCode(),
@@ -307,30 +303,71 @@ public class ScrapeJobOrchestrator {
 			return;
 		}
 
-		runJob(job, counters);
+		executionPlans.add(new ScrapeJobExecutionPlan(sourceKey(source), job));
 	}
 
-	private void runJob(ScrapeJob job, RunCounters counters) {
+	private void runCreatedJobs(List<ScrapeJobExecutionPlan> executionPlans, RunCounters counters) {
+		if (executionPlans.isEmpty()) {
+			return;
+		}
+		Map<String, Semaphore> sourceLimits = executionPlans.stream()
+				.map(ScrapeJobExecutionPlan::sourceKey)
+				.distinct()
+				.collect(java.util.stream.Collectors.toMap(
+						sourceKey -> sourceKey,
+						sourceKey -> new Semaphore(executionProperties.getPerSourceConcurrency())
+				));
+		List<CompletableFuture<Void>> futures = executionPlans.stream()
+				.map(plan -> CompletableFuture.runAsync(
+						() -> runJobWithSourceLimit(plan, sourceLimits.get(plan.sourceKey()), counters),
+						scrapeJobExecutor
+				))
+				.toList();
+		CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+	}
+
+	private void runJobWithSourceLimit(ScrapeJobExecutionPlan plan, Semaphore sourceLimit, RunCounters counters) {
+		boolean acquired = false;
 		try {
-			ScrapeJob runningJob = scrapeJobService.markRunning(job.getId());
-			ScraperResult result = scraperRunner.run(runningJob);
-			scrapeJobService.markSuccess(job.getId(), result.postsFound(), result.postsSaved());
-			counters.postsFound += result.postsFound();
-			counters.postsSaved += result.postsSaved();
-			counters.jobsSucceeded++;
-		} catch (Exception exception) {
-			counters.jobsFailed++;
-			log.error("Scheduled scrape job failed: jobId={}", job.getId(), exception);
-			markJobFailed(job, exception);
+			sourceLimit.acquire();
+			acquired = true;
+			ScrapeJobExecutionOutcome outcome = scrapeJobExecutionService.runPendingJob(plan.job());
+			if (outcome.success()) {
+				counters.jobsSucceeded.incrementAndGet();
+				counters.postsFound.addAndGet(outcome.postsFound());
+				counters.postsSaved.addAndGet(outcome.postsSaved());
+			} else {
+				counters.jobsFailed.incrementAndGet();
+			}
+		} catch (InterruptedException exception) {
+			Thread.currentThread().interrupt();
+			counters.jobsFailed.incrementAndGet();
+			log.error("Scheduled scrape job interrupted before execution: jobId={}", plan.job().getId(), exception);
+			try {
+				scrapeJobService.markFailed(plan.job().getId(), "Scrape job execution was interrupted");
+			} catch (Exception statusException) {
+				log.error("Failed to mark interrupted scrape job as FAILED: jobId={}", plan.job().getId(), statusException);
+			}
+		} catch (RuntimeException exception) {
+			counters.jobsFailed.incrementAndGet();
+			log.error("Scheduled scrape job failed unexpectedly: jobId={}", plan.job().getId(), exception);
+			try {
+				scrapeJobService.markFailed(plan.job().getId(), exception.getMessage());
+			} catch (Exception statusException) {
+				log.error("Failed to mark failed scrape job as FAILED: jobId={}", plan.job().getId(), statusException);
+			}
+		} finally {
+			if (acquired) {
+				sourceLimit.release();
+			}
 		}
 	}
 
-	private void markJobFailed(ScrapeJob job, Exception exception) {
-		try {
-			scrapeJobService.markFailed(job.getId(), exception.getMessage());
-		} catch (Exception statusException) {
-			log.error("Failed to mark scrape job as FAILED: jobId={}", job.getId(), statusException);
+	private String sourceKey(Source source) {
+		if (source.getId() != null) {
+			return String.valueOf(source.getId());
 		}
+		return source.getCode() == null ? "unknown" : source.getCode();
 	}
 
 	private OffsetDateTime nowInZone(ZoneId zoneId) {
@@ -339,11 +376,14 @@ public class ScrapeJobOrchestrator {
 
 	private static final class RunCounters {
 
-		private int jobsCreated;
-		private int jobsSucceeded;
-		private int jobsFailed;
-		private int jobsSkipped;
-		private int postsFound;
-		private int postsSaved;
+		private final AtomicInteger jobsCreated = new AtomicInteger();
+		private final AtomicInteger jobsSucceeded = new AtomicInteger();
+		private final AtomicInteger jobsFailed = new AtomicInteger();
+		private final AtomicInteger jobsSkipped = new AtomicInteger();
+		private final AtomicInteger postsFound = new AtomicInteger();
+		private final AtomicInteger postsSaved = new AtomicInteger();
+	}
+
+	private record ScrapeJobExecutionPlan(String sourceKey, ScrapeJob job) {
 	}
 }

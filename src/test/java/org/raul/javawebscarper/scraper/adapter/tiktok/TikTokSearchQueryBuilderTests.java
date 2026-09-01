@@ -12,7 +12,7 @@ class TikTokSearchQueryBuilderTests {
 	void buildsKeywordSearchUrlWithUnicodeEncoding() {
 		String url = queryBuilder.buildSearchUrl("https://www.tiktok.com/", "İlham Əliyev", TikTokSearchMode.KEYWORD);
 
-		assertThat(url).isEqualTo("https://www.tiktok.com/search/video?q=%C4%B0lham%20%C6%8Fliyev");
+		assertThat(url).isEqualTo("https://www.tiktok.com/search/video?q=%C4%B0lham%20%C6%8Fliyev%20Az%C9%99rbaycan");
 	}
 
 	@Test

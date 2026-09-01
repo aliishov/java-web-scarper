@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.raul.javawebscarper.config.ScraperEngineProperties;
 import org.raul.javawebscarper.model.ScrapeJob;
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
 import org.raul.javawebscarper.scraper.engine.ScraperEngine;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionContext;
 import org.raul.javawebscarper.scraper.engine.ScraperExecutionException;
@@ -64,8 +65,16 @@ public class EngineScraperRunner implements ScraperRunner {
 				dateTo,
 				properties.getMaxPages(),
 				properties.getMaxPosts(),
-				Map.of("runner", getClass().getSimpleName())
+				resolveSearchRegion(job),
+				Map.of(
+						"runner", getClass().getSimpleName(),
+						"searchRegion", resolveSearchRegion(job).name()
+				)
 		);
+	}
+
+	private SearchRegion resolveSearchRegion(ScrapeJob job) {
+		return job.getSearchRegion() == null ? SearchRegion.defaultRegion() : job.getSearchRegion();
 	}
 
 	private ScraperResult toScraperResult(ScraperExecutionContext context, ScraperExecutionResult result) {

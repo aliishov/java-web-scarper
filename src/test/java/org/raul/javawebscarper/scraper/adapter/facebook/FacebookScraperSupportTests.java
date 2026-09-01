@@ -46,8 +46,8 @@ class FacebookScraperSupportTests {
 		FacebookSearchQueryBuilder builder = new FacebookSearchQueryBuilder();
 
 		assertThat(builder.buildSearchUrl("https://www.facebook.com/", "Məhkəmə", FacebookSearchMode.TOP))
-				.isEqualTo("https://www.facebook.com/search/posts/?q=M%C9%99hk%C9%99m%C9%99");
+				.isEqualTo("https://www.facebook.com/search/posts/?q=M%C9%99hk%C9%99m%C9%99+Az%C9%99rbaycan");
 		assertThat(builder.buildSearchUrl("https://www.facebook.com", "court", FacebookSearchMode.RECENT))
-				.startsWith("https://www.facebook.com/search/posts/?q=court&filters=");
+				.startsWith("https://www.facebook.com/search/posts/?q=court+Az%C9%99rbaycan&filters=");
 	}
 }

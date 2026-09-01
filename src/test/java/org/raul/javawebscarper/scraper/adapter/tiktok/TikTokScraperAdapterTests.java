@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -23,7 +24,7 @@ class TikTokScraperAdapterTests {
 	@Test
 	void authFailureDoesNotBecomeEmptyResult() {
 		TikTokSessionResolver resolver = mock(TikTokSessionResolver.class);
-		when(resolver.resolve()).thenThrow(new TikTokAuthenticationException(
+		when(resolver.resolve(any())).thenThrow(new TikTokAuthenticationException(
 				TikTokAuthenticationStatus.CAPTCHA_REQUIRED,
 				"TIKTOK_CAPTCHA_REQUIRED: TikTok requires CAPTCHA."
 		));

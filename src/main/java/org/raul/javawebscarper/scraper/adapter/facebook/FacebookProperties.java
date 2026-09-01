@@ -29,7 +29,7 @@ public class FacebookProperties {
 	@Positive
 	private long manualVerificationTimeoutMs = 300_000;
 	@Size(max = 32)
-	private String locale = "en-US";
+	private String locale = "az-AZ";
 	@Size(max = 64)
 	private String timezoneId = "Asia/Baku";
 	private FacebookSearchMode searchMode = FacebookSearchMode.RECENT;

@@ -19,4 +19,10 @@ class InstagramSearchQueryBuilderTests {
 	void rejectsMultiWordKeywordForHashtagFallback() {
 		assertThat(builder.hashtagFallbackAllowed("azerbaijan news")).isFalse();
 	}
+
+	@Test
+	void addsAzerbaijanContextToKeywordSearch() {
+		assertThat(builder.buildSearchUrl("https://www.instagram.com", "Ali Mehkeme", InstagramSearchMode.KEYWORD))
+				.isEqualTo("https://www.instagram.com/explore/search/keyword/?q=Ali%20Mehkeme%20Az%C9%99rbaycan");
+	}
 }

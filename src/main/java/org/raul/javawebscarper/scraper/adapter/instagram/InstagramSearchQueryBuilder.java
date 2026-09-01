@@ -1,5 +1,7 @@
 package org.raul.javawebscarper.scraper.adapter.instagram;
 
+import org.raul.javawebscarper.model.enumerated.SearchRegion;
+import org.raul.javawebscarper.scraper.support.SocialSearchRegionContext;
 import org.springframework.stereotype.Component;
 
 import java.net.URLEncoder;
@@ -9,6 +11,15 @@ import java.nio.charset.StandardCharsets;
 public class InstagramSearchQueryBuilder {
 
 	public String buildSearchUrl(String baseUrl, String keyword, InstagramSearchMode searchMode) {
+		return buildSearchUrl(baseUrl, keyword, searchMode, SocialSearchRegionContext.DEFAULT_REGION);
+	}
+
+	public String buildSearchUrl(
+			String baseUrl,
+			String keyword,
+			InstagramSearchMode searchMode,
+			SearchRegion searchRegion
+	) {
 		InstagramSearchMode mode = resolveMode(keyword, searchMode);
 		String base = normalizeBaseUrl(baseUrl);
 		if (mode == InstagramSearchMode.HASHTAG) {
@@ -18,7 +29,8 @@ public class InstagramSearchQueryBuilder {
 			}
 			return base + "/explore/tags/" + encodePathSegment(hashtag) + "/";
 		}
-		return base + "/explore/search/keyword/?q=" + encode(keyword);
+		String searchQuery = SocialSearchRegionContext.apply(keyword, searchRegion);
+		return base + "/explore/search/keyword/?q=" + encode(searchQuery);
 	}
 
 	public InstagramSearchMode resolveMode(String keyword, InstagramSearchMode configuredMode) {

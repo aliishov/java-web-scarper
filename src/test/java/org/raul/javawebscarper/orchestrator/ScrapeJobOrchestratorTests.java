@@ -15,8 +15,8 @@ import org.raul.javawebscarper.model.enumerated.Language;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobRunType;
 import org.raul.javawebscarper.model.enumerated.ScrapeJobStatus;
 import org.raul.javawebscarper.scheduler.PreviousDayDateRangeResolver;
-import org.raul.javawebscarper.scraper.ScraperResult;
-import org.raul.javawebscarper.scraper.ScraperRunner;
+import org.raul.javawebscarper.service.ScrapeJobExecutionOutcome;
+import org.raul.javawebscarper.service.ScrapeJobExecutionService;
 import org.raul.javawebscarper.service.KeywordService;
 import org.raul.javawebscarper.service.ScrapeJobService;
 import org.raul.javawebscarper.service.SourceLanguageSupportService;
@@ -64,7 +64,7 @@ class ScrapeJobOrchestratorTests {
 	private ScrapeJobService scrapeJobService;
 
 	@Mock
-	private ScraperRunner scraperRunner;
+	private ScrapeJobExecutionService scrapeJobExecutionService;
 
 	private ScrapeSchedulerProperties properties;
 	private DailyScrapingProperties dailyProperties;
@@ -87,12 +87,13 @@ class ScrapeJobOrchestratorTests {
 				sourceService,
 				keywordService,
 				scrapeJobService,
-				scraperRunner,
+				scrapeJobExecutionService,
 				properties,
 				FIXED_CLOCK,
 				dailyProperties,
 				new PreviousDayDateRangeResolver(),
 				new SourceLanguageSupportService(),
+				new org.raul.javawebscarper.config.ScrapeJobExecutionProperties(),
 				Runnable::run
 		);
 
@@ -129,8 +130,7 @@ class ScrapeJobOrchestratorTests {
 				DATE_TO,
 				ScrapeJobRunType.SCHEDULED
 		)).thenReturn(job);
-		when(scrapeJobService.markRunning(job.getId())).thenReturn(job);
-		when(scraperRunner.run(job)).thenReturn(ScraperResult.empty());
+		when(scrapeJobExecutionService.runPendingJob(job)).thenReturn(ScrapeJobExecutionOutcome.success(0, 0));
 
 		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
 
@@ -140,7 +140,7 @@ class ScrapeJobOrchestratorTests {
 		assertThat(response.jobsSucceeded()).isEqualTo(1);
 		assertThat(response.jobsFailed()).isZero();
 		assertThat(response.jobsSkipped()).isZero();
-		verify(scrapeJobService).markSuccess(job.getId(), 0, 0);
+		verify(scrapeJobExecutionService).runPendingJob(job);
 		verify(scrapeJobService, never()).hasJobForRunType(
 				source,
 				keyword,
@@ -173,7 +173,6 @@ class ScrapeJobOrchestratorTests {
 
 	@Test
 	void failedScraperMarksJobAsFailed() {
-		RuntimeException scraperFailure = new RuntimeException("scraper unavailable");
 		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
 		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
 		when(scrapeJobService.hasActiveJob(source, keyword, DATE_FROM, DATE_TO)).thenReturn(false);
@@ -184,8 +183,7 @@ class ScrapeJobOrchestratorTests {
 				DATE_TO,
 				ScrapeJobRunType.SCHEDULED
 		)).thenReturn(job);
-		when(scrapeJobService.markRunning(job.getId())).thenReturn(job);
-		when(scraperRunner.run(job)).thenThrow(scraperFailure);
+		when(scrapeJobExecutionService.runPendingJob(job)).thenReturn(ScrapeJobExecutionOutcome.failed());
 
 		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
 
@@ -193,7 +191,7 @@ class ScrapeJobOrchestratorTests {
 		assertThat(response.jobsSucceeded()).isZero();
 		assertThat(response.jobsFailed()).isEqualTo(1);
 		assertThat(response.jobsSkipped()).isZero();
-		verify(scrapeJobService).markFailed(job.getId(), "scraper unavailable");
+		verify(scrapeJobExecutionService).runPendingJob(job);
 	}
 
 	@Test
@@ -214,15 +212,14 @@ class ScrapeJobOrchestratorTests {
 				DATE_TO,
 				ScrapeJobRunType.SCHEDULED
 		)).thenReturn(job);
-		when(scrapeJobService.markRunning(job.getId())).thenReturn(job);
-		when(scraperRunner.run(job)).thenReturn(ScraperResult.empty());
+		when(scrapeJobExecutionService.runPendingJob(job)).thenReturn(ScrapeJobExecutionOutcome.success(0, 0));
 
 		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
 
 		assertThat(response.jobsCreated()).isEqualTo(1);
 		verify(scrapeJobService, never()).hasActiveJob(source, secondKeyword, DATE_FROM, DATE_TO);
-		verify(scraperRunner).run(job);
-		verifyNoMoreInteractions(scraperRunner);
+		verify(scrapeJobExecutionService).runPendingJob(job);
+		verifyNoMoreInteractions(scrapeJobExecutionService);
 	}
 
 	@Test
@@ -237,8 +234,7 @@ class ScrapeJobOrchestratorTests {
 				DATE_TO,
 				ScrapeJobRunType.SCHEDULED
 		)).thenReturn(job);
-		when(scrapeJobService.markRunning(job.getId())).thenReturn(job);
-		when(scraperRunner.run(job)).thenReturn(ScraperResult.empty());
+		when(scrapeJobExecutionService.runPendingJob(job)).thenReturn(ScrapeJobExecutionOutcome.success(0, 0));
 
 		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
 
@@ -311,8 +307,7 @@ class ScrapeJobOrchestratorTests {
 				DATE_TO,
 				ScrapeJobRunType.SCHEDULED
 		)).thenReturn(mediaJob);
-		when(scrapeJobService.markRunning(mediaJob.getId())).thenReturn(mediaJob);
-		when(scraperRunner.run(mediaJob)).thenReturn(ScraperResult.empty());
+		when(scrapeJobExecutionService.runPendingJob(mediaJob)).thenReturn(ScrapeJobExecutionOutcome.success(0, 0));
 
 		ScheduledScrapeRunResponseDTO response = orchestrator.createAndRunScheduledJobs();
 
@@ -364,11 +359,6 @@ class ScrapeJobOrchestratorTests {
 				.runType(ScrapeJobRunType.DAILY_PREVIOUS_DAY)
 				.status(ScrapeJobStatus.PENDING)
 				.build();
-		ScraperResult scraperResult = new ScraperResult(
-				3,
-				2,
-				List.of(UUID.randomUUID(), UUID.randomUUID())
-		);
 		when(sourceService.findEnabledEntities()).thenReturn(List.of(source));
 		when(keywordService.findEnabledEntities()).thenReturn(List.of(keyword));
 		when(scrapeJobService.hasJobForRunType(
@@ -386,8 +376,7 @@ class ScrapeJobOrchestratorTests {
 				DAILY_DATE_TO,
 				ScrapeJobRunType.DAILY_PREVIOUS_DAY
 		)).thenReturn(dailyJob);
-		when(scrapeJobService.markRunning(dailyJob.getId())).thenReturn(dailyJob);
-		when(scraperRunner.run(dailyJob)).thenReturn(scraperResult);
+		when(scrapeJobExecutionService.runPendingJob(dailyJob)).thenReturn(ScrapeJobExecutionOutcome.success(3, 2));
 
 		DailyScrapeRunResponseDTO response = orchestrator.createAndRunDailyPreviousDayJobs();
 
@@ -399,7 +388,7 @@ class ScrapeJobOrchestratorTests {
 		assertThat(response.jobsFailed()).isZero();
 		assertThat(response.postsFound()).isEqualTo(3);
 		assertThat(response.postsSaved()).isEqualTo(2);
-		verify(scrapeJobService).markSuccess(dailyJob.getId(), 3, 2);
+		verify(scrapeJobExecutionService).runPendingJob(dailyJob);
 	}
 
 	@Test
@@ -430,8 +419,7 @@ class ScrapeJobOrchestratorTests {
 				DAILY_DATE_TO,
 				ScrapeJobRunType.DAILY_PREVIOUS_DAY
 		)).thenReturn(dailyJob);
-		when(scrapeJobService.markRunning(dailyJob.getId())).thenReturn(dailyJob);
-		when(scraperRunner.run(dailyJob)).thenReturn(ScraperResult.empty());
+		when(scrapeJobExecutionService.runPendingJob(dailyJob)).thenReturn(ScrapeJobExecutionOutcome.success(0, 0));
 
 		DailyScrapeRunResponseDTO firstRun = orchestrator.createAndRunDailyPreviousDayJobs();
 		DailyScrapeRunResponseDTO secondRun = orchestrator.createAndRunDailyPreviousDayJobs();

@@ -73,6 +73,7 @@ class InstagramPropertiesTests {
 		assertThat(properties.isAuthenticationRequired()).isTrue();
 		assertThat(properties.getLoginUrl()).isEqualTo("https://www.instagram.com/accounts/login/");
 		assertThat(properties.getAuthVerificationUrl()).isEqualTo("https://www.instagram.com/");
+		assertThat(properties.getLocale()).isEqualTo("az-AZ");
 		assertThat(properties.getSearchMode()).isEqualTo(InstagramSearchMode.AUTO);
 		assertThat(properties.isIncludeReels()).isFalse();
 		assertThat(properties.isIncludeSponsored()).isFalse();
